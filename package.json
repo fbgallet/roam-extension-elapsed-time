@@ -1,0 +1,25 @@
+{
+  "name": "roam-extension-elapsed-time",
+  "version": "1.0.0",
+  "description": "Timestamp Buttons and elapsed time calculator Sb migration to Roam Depot",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fbgallet/roam-extension-elapsed-time.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/fbgallet/roam-extension-elapsed-time/issues"
+  },
+  "homepage": "https://github.com/fbgallet/roam-extension-elapsed-time#readme",
+  "dependencies": {
+    "izitoast": "^1.4.0",
+    "roamjs-components": "^0.70.21",
+    "roamjs-scripts": "^0.21.6"
+  }
+}
