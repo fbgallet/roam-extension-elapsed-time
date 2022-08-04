@@ -1,17 +1,15 @@
 import iziToast from 'izitoast';
 import '../node_modules/izitoast/dist/css/iziToast.css';
 
-iziToast.settings({
-    close: false,
-    icon: '',
-    timeout: 8000,
-    progressBar: true,
-    layout: 2
-  })
-iziToast.show({
-    title: 'Hey',
-    message: 'Hello world!'
-});
+/************************* DEFAULT SETTINGS **************************/
+var defaultTimeLimit = 60;     // set to 0 if you want always popup notification
+var limitPresets = true;	   // false if you want disable trigger words search
+var inlineMinLimit = "goal:"; 
+var inlineMaxLimit = "max:";
+var pomoIsLimit = true;		  // Pomodotor timer as min trigger
+var confirmPopup = true;		  // false if you want automatic formating without popup notification
+var appendHourTag = false;      // add a tag with the round current hour, like #19:00
+/**********************************************************************/
 
 var totalTitle = "Total time: **(<th>)**"
 var triggerTab = [];
@@ -265,139 +263,157 @@ function getLimitFlags(parentUid) {
 /* ELAPSED TIME SB */
 
 
-async function elapsedTime(blockUID) {
+function getBlockContent(uid) {
+    return window.roamAlphaAPI
+                 .q(`[:find (pull ?page [:block/string])
+                      :where [?page :block/uid "${uid}"]  ]`
+                    )[0][0].string;
+}
 
-    /************************* DEFAULT SETTINGS **************************/
-        let defaultTimeLimit = 60;     // set to 0 if you want always popup notification
-        let limitPresets = true;	   // false if you want disable trigger words search
-        let inlineMinLimit = "goal:"; 
-        let inlineMaxLimit = "max:";
-        //let includeFirstChild = true;   // search for trigger words in current block AND first child block
-        let pomoIsLimit = true;		  // Pomodotor timer as min trigger
-        let confirmPopup = true;		  // false if you want automatic formating without popup notification
-        let appendHourTag = false;      // add a tag with the round current hour, like #19:00
+function TimeStamp(tColon) {
+    this.tColon = tColon,
+    this.m = parseInt(tColon.slice(-2)),
+    this.h = parseInt(tColon.slice(0,2)),
+    this.mTotal = (this.h*60) + this.m
+}
 
-        let blockExcessFormat = limitFlag.task.limit.failure;
-        let blockNotEnoughFormat = limitFlag.task.goal.failure; 
-        let blockGoodLimitFormat = limitFlag.task.limit.success;  
-        let blockGoodGoalFormat = limitFlag.task.goal.success; 
-    /**********************************************************************/
+function getNormalizedTimestamp(h,m) {
+    return addZero(h) + ":" + addZero(m);
+}
 
-        console.log(blockExcessFormat);
-
-    let q0 = `[:find (pull ?page [:block/string])
-                    :where [?page :block/uid "${blockUID}"]  ]`;
-    let block = window.roamAlphaAPI.q(q0);
-    let blockContent = block[0][0].string;
-    let blockSplit = blockContent.split(":");
-    let b = blockSplit[0].length - 2;
-    if (b < 0) { b = 0;}
-    let beginH = parseInt(blockContent.slice(b+0,b+2));
-    let beginM = parseInt(blockContent.slice(b+3,b+5));
-    let beginT = blockContent.slice(b+0,b+5);
-
-    let currentH, currentM, currentT;
-    let title="";
-    let withPomo = false;
-
-    let intIndex = blockContent.search(intervalSeparator.trim());
-    let hasSndTime=false;
-    if (blockSplit.length>2) {
-    currentH = parseInt(blockSplit[1].slice(-2));
-    currentM = parseInt(blockSplit[2].slice(0,2));
-    hasSndTime = (isNaN(currentH)==false) && (isNaN(currentM)==false);  
+function addZero(i) {
+    if (i < 10) {
+      i = "0" + i;
     }
-    if ((intIndex >= b+5) && (intIndex < b+7) && hasSndTime) {
-    let l = intervalSeparator.length;
-    currentT = addZero(currentH) + ":" + addZero(currentM);
-    title = blockContent.slice(blockSplit[0].length+blockSplit[1].length+5);
-    }
-    else {
-    let current = new Date();
-    currentH = current.getHours();
-    currentM = current.getMinutes();
-    currentT = addZero(currentH) + ":" + addZero(currentM);
-    title = blockContent.slice(b+5);
-    }
-    
-    let elapsedH = currentH - beginH;
-    if (elapsedH < 0) {elapsedH = 24 - beginH + currentH; }
-    let elapsedM = currentM - beginM;
-    let elapsedT = (elapsedH * 60) + elapsedM;
+    return i;
+  }
 
+function getLeftShift(firstSplit) {
+    let shift = firstSplit.length - 2;
+    if (shift < 0) shift=0;
+    return shift;
+}
+
+function getSecondTimestampStr(split, shift, sepIndex) {
+    if (split.length>2) {
+        let h = parseInt(split[1].slice(-2));
+        let m = parseInt(split[2].slice(0,2));
+        let hasSndTime = (isNaN(h)==false) && (isNaN(m)==false);  
+        if ((sepIndex >= shift+5) && (sepIndex < shift+7) && hasSndTime)
+            return getNormalizedTimestamp(h,m);
+    }
+    return null;
+}
+
+function getDifferenceBetweenTwoTimeStamps(begin,end) {
+    let h = end.h - begin.h;
+    if (h < 0) h = 24 - begin.h + end.h;
+    let m = end.m - begin.m;
+    return getNormalizedTimestamp(h,m);
+}
+
+function concatTimeStamps(begin,end,elapsed) {
+    return begin + intervalSeparator + end
+    + " " + durationFormat.replace('<d>',elapsed.mTotal) + " ";
+}
+
+async function updateBlock(uid,concent,isOpen) {
+    await window.roamAlphaAPI
+                .updateBlock({'block': 
+                    {'uid': uid,
+                    'string': content,
+                    'open': isOpen }});
+}
+
+async function elapsedTime(blockUID) {    
     let hourTag = "";
-    if (appendHourTag) { hourTag = " #[[" + beginH + ":00]]"; }
+    let blockContent = getBlockContent(blockUID);
+    let blockSplit = blockContent.split(':');
+    let leftShift=getLeftShift(blockSplit[0])
+    let begin = new TimeStamp(blockContent.slice(leftShift,leftShift+5));
+    let title;
+    let endStr = getSecondTimestampStr(blockSplit, leftShift, blockContent.search(intervalSeparator.trim()));
+    if (endStr!=null) {
+        title = blockContent.slice(blockSplit[0].length+blockSplit[1].length+5);
+    } else {
+        let d = new Date();
+        endStr = addZero(d.getHours()) + ":" + addZero(d.getMinutes());
+        title = blockContent.slice(leftShift+5);
+    }
+    let end = new TimeStamp(endStr); 
+    let elapsed = new TimeStamp(getDifferenceBetweenTwoTimeStamps(begin,end));
+    let leftPart = blockSplit[0].slice(0, -2) + concatTimeStamps(begin.tColon,end.tColon,elapsed);
+    if (appendHourTag) hourTag = " #[[" + begin.h + ":00]]";
+    let rightPart = title.trim()+hourTag;
+    compareToLimitsAndUpdate(leftPart,rightPart,elapsed.mTotal)
+}
 
-    let newContent = blockSplit[0].slice(0, -2) + beginT + intervalSeparator + currentT
-                    + " " + durationFormat.replace('<d>',elapsedT) + " ";
-    let titleForSearch = title;
-
+function compareToLimitsAndUpdate(leftPart,rightPart,elapsed) {
     let withMin = false;
     let withMax = false;
-    let minIndex = titleForSearch.search(new RegExp(inlineMinLimit, "i"));
-    let maxIndex = titleForSearch.search(new RegExp(inlineMaxLimit, "i"));
+    let minIndex = rightPart.search(new RegExp(inlineMinLimit, "i"));
+    let maxIndex = rightPart.search(new RegExp(inlineMaxLimit, "i"));
     let timeLimitMin=0, timeLimitMax=1000;
 
     if (minIndex != -1) {
-    withMin = true;
-    timeLimitMin = extractLimit(titleForSearch.slice(minIndex), inlineMinLimit.length);
+        withMin = true;
+        timeLimitMin = extractLimit(rightPart.slice(minIndex), inlineMinLimit.length);
     } 
     if (maxIndex != -1) {
-    withMax = true;
-    timeLimitMax = extractLimit(titleForSearch.slice(maxIndex), inlineMaxLimit.length);
-    }
-
-    if (pomoIsLimit) {
-    let indexPomo = title.search("POMO");
-    if (indexPomo != -1) {
-        timeLimitMax = extractLimit(titleForSearch.slice(indexPomo), 8);
         withMax = true;
-        withPomo = true;
+        timeLimitMax = extractLimit(rightPart.slice(maxIndex), inlineMaxLimit.length);
     }
+    let withPomo = false;
+    if (pomoIsLimit) {
+        let indexPomo = title.search("POMO");
+        if (indexPomo != -1) {
+            timeLimitMax = extractLimit(rightPart.slice(indexPomo), 8);
+            withMax = true;
+            withPomo = true;
+        }
     }
     let limitType = 'Goal or limit';
     if (limitPresets && (!withMin && !withMax && !withPomo)) {
-    //  let indexLimit = -1;
-    let limitTab = getLimitOfFirstTriggerWord(titleForSearch.toLowerCase());
-    let timeLimit = limitTab[0];
-    if (timeLimit !=0) { limitType = limitTab[1]; }
-    if (limitType == 'limit') {
-        limitType = 'Limit';
-        withMax = true;
-        timeLimitMax = timeLimit;
-    } else if (limitType == 'goal') {
-        limitType = 'Goal';
-        withMin = true;
-        timeLimitMin = timeLimit;
-    }
+        let limitTab = getLimitOfFirstTriggerWord(rightPart.toLowerCase());
+        let timeLimit = limitTab[0];
+        if (timeLimit !=0) { limitType = limitTab[1]; }
+        if (limitType == 'limit') {
+            limitType = 'Limit';
+            withMax = true;
+            timeLimitMax = timeLimit;
+        } else if (limitType == 'goal') {
+            limitType = 'Goal';
+            withMin = true;
+            timeLimitMin = timeLimit;
+        }
     }  
-
     let triggered = withMax || withMin || withPomo;
     if (withMax && withMin && (timeLimitMax <= timeLimitMin)) { withMin = false; }
     if (!triggered) {timeLimitMax = defaultTimeLimit;}
-    let exceeded = ((withMax || !triggered) && (elapsedT > timeLimitMax));
-    let insufficient = (withMin && (elapsedT < timeLimitMin));
+
+    let exceeded = ((withMax || !triggered) && (elapsed > timeLimitMax));
+    let insufficient = (withMin && (elapsed < timeLimitMin));
     let okUnder = !exceeded && !withMin && triggered;
     let okOver = !insufficient && !withMax && triggered; 
 
     if (exceeded || insufficient || okUnder || okOver || triggered) { 
-        let textTitle = elapsedT + "' elapsed.";
+        let textTitle = elapsed + "' elapsed.";
         let textMessage = limitType + " was ";
         let buttonCaption = "Too much anyway!";
-        let badFormat = blockExcessFormat;
-        let goodFormat = blockGoodGoalFormat;
+        let badFormat = limitFlag.task.limit.failure;
+        let goodFormat = limitFlag.task.goal.success;
         
         if ((!exceeded && !insufficient) || (okUnder && !insufficient) || (okOver && !exceeded)) {
         if ((!okOver && !okUnder)) { 
             textMessage += "between " + timeLimitMin + "' & " + timeLimitMax + "'";
-            goodFormat = blockGoodGoalFormat;
+            goodFormat = limitFlag.task.goal.success;
         } else if (okUnder) {
             textMessage += "less than " + timeLimitMax + "'";
-            badFormat = blockExcessFormat;
-            goodFormat = blockGoodLimitFormat;
+            badFormat = limitFlag.task.limit.failure;
+            goodFormat = limitFlag.task.limit.success;
         } else {
             textMessage += "more than " + timeLimitMin + "'";
-            badFormat = blockNotEnoughFormat;
+            badFormat = limitFlag.task.goal.failure;
             buttonCaption = "Not enough anyway!";
         }
         if (confirmPopup) {
@@ -409,85 +425,64 @@ async function elapsedTime(blockUID) {
             position: 'bottomCenter',  drag: false, close:true,
             buttons: [
                 ['<button>Great!</button>', async (instance, toast)=> {
-                await window.roamAlphaAPI.updateBlock({'block': 
-                    {'uid': blockUID,
-                    'string': newContent + goodFormat + ' ' + title.trim() + hourTag,
-                    'open': true  }});                          
-
-                instance.hide({ transitionOut: 'fadeOut' }, toast, 'button');
+                    updateBlock(blockUID,leftPart + goodFormat + ' ' + rightPart,true);
+                    instance.hide({ transitionOut: 'fadeOut' }, toast, 'button');
                 }, true],
                 [buttonCaption, async (instance, toast)=> {
-                await window.roamAlphaAPI.updateBlock({'block': 
-                    {'uid': blockUID,
-                    'string': newContent + badFormat + ' ' + title.trim() + hourTag,
-                    'open': true  }});                          
-                instance.hide({ transitionOut: 'fadeOut' }, toast, 'button');
+                    updateBlock(blockUID,leftPart + badFormat + ' ' + rightPart,true);
+                    instance.hide({ transitionOut: 'fadeOut' }, toast, 'button');
                 }]
             ], 
         });
         }
         }
         else {
-        if ((exceeded && withMin) || (insufficient && withMax)) { 
-            textMessage += "between " + timeLimitMin + "' & " + timeLimitMax + "'";
-            buttonCaption = "Too much!";
-            if (insufficient) { 
-            badFormat = blockNotEnoughFormat;
-            goodFormat = blockGoodLimitFormat;
-            buttonCaption = "Not enough!";
-            }
-        } else if ((!okUnder && !insufficient)  || exceeded) {
-            buttonCaption = "Too much!";
-            goodFormat = blockGoodLimitFormat;
-        if (!triggered) { 
-            textMessage = "Default alert time is " + timeLimitMax + "'";}
-            else {textMessage += "less than " + timeLimitMax + "'";}
-        } else {
+            if ((exceeded && withMin) || (insufficient && withMax)) { 
+                textMessage += "between " + timeLimitMin + "' & " + timeLimitMax + "'";
+                buttonCaption = "Too much!";
+                if (insufficient) { 
+                badFormat = limitFlag.task.goal.failure;
+                goodFormat = limitFlag.task.limit.success;
+                buttonCaption = "Not enough!";
+                }
+            } else if ((!okUnder && !insufficient)  || exceeded) {
+                buttonCaption = "Too much!";
+                goodFormat = limitFlag.task.limit.success;
             if (!triggered) { 
-            textMessage = "Default alert time is " + timeLimitMax + " '.";}
-            else { textMessage += "more than " + timeLimitMin + " '."; }
-            buttonCaption = "Not enough!"
-            badFormat = blockNotEnoughFormat;
-            goodFormat = blockGoodGoalFormat;
+                textMessage = "Default alert time is " + timeLimitMax + "'";}
+                else {textMessage += "less than " + timeLimitMax + "'";}
+            } else {
+                if (!triggered) { 
+                textMessage = "Default alert time is " + timeLimitMax + " '.";}
+                else { textMessage += "more than " + timeLimitMin + " '."; }
+                buttonCaption = "Not enough!"
+                badFormat = limitFlag.task.goal.failure;
+                goodFormat = limitFlag.task.goal.success;
+            }
+            
+            if (confirmPopup) {
+                buttonCaption = "<button>" + buttonCaption + "</button>";
+                iziToast.warning({
+                    timeout: 6000, displayMode: 'replace', id: 'timing', zindex: 999, 
+                    title: textTitle,
+                    message: textMessage,
+                    position: 'bottomCenter',  drag: false, close:true,
+                    buttons: [
+                        ['<button>Good anyway!</button>', async (instance, toast)=> {
+                            updateBlock(blockUID,leftPart + goodFormat + ' ' + rightPart,true);
+                            instance.hide({ transitionOut: 'fadeOut' }, toast, 'button');
+                        }],
+                        [buttonCaption, async (instance, toast)=> {
+                            updateBlock(blockUID,leftPart + badFormat + ' ' + rightPart,true);
+                            instance.hide({ transitionOut: 'fadeOut' }, toast, 'button');
+                        }, true]
+                    ], 
+                });
+            }
+        else leftPart = leftPart + badFormat;
         }
-        
-        if (confirmPopup) {
-        buttonCaption = "<button>" + buttonCaption + "</button>";
-        iziToast.warning({
-            timeout: 6000, displayMode: 'replace', id: 'timing', zindex: 999, 
-            title: textTitle,
-            message: textMessage,
-            position: 'bottomCenter',  drag: false, close:true,
-            buttons: [
-                ['<button>Good anyway!</button>', async (instance, toast)=> {
-                    console.log("Goooood");
-                    await window.roamAlphaAPI.updateBlock({'block': 
-                    {'uid': blockUID,
-                    'string': newContent + goodFormat + ' ' + title.trim() + hourTag,
-                    'open': true  }});   
-                instance.hide({ transitionOut: 'fadeOut' }, toast, 'button');
-                }],
-                [buttonCaption, async (instance, toast)=> {
-                    console.log("Baaaaaad");
-                    await window.roamAlphaAPI.updateBlock({'block': 
-                    {'uid': blockUID,
-                    'string': newContent + badFormat + ' ' + title.trim() + hourTag,
-                    'open': true  }});
-                instance.hide({ transitionOut: 'fadeOut' }, toast, 'button');
-                }, true]
-            ], 
-        });
-        }
-        else {
-        newContent = newContent + badFormat;
-        }
-    } 
     }
-
-window.roamAlphaAPI.updateBlock({'block': 
-                          {'uid': blockUID,
-                           'string': newContent + title.trim() + hourTag,
-                           'open': true  }}); 
+    updateBlock(blockUID,leftPart + rightPart,true);
 }
 
 function getLimitOfFirstTriggerWord(s) {
@@ -527,13 +522,6 @@ function extractLimit(s, shift) {
   return t;
 }
 
-function addZero(i) {
-  if (i < 10) {
-    i = "0" + i;
-  }
-  return i;
-}
-
 /*==============================================================================================================================*/
 
 /* LOAD */
@@ -550,24 +538,24 @@ export default {
 
       getParameters();
   
-   /*   const args = {
-        text: 'X',
-        help: "Y",
+      const elapCmd = {
+        text: 'ELAPSEDTIME',
+        help: "Calcul elapsed time between now an a timestamps at the beginning of the block",
         handler: (context) => () => {
-
+          elapsedTime(context.targetUid)
           return '';
         },
       }      
       if (window.roamjs?.extension?.smartblocks) {
-       // window.roamjs.extension.smartblocks.registerCommand(args);        
+        window.roamjs.extension.smartblocks.registerCommand(elapCmd);        
       } else {
         document.body.addEventListener(
           `roamjs:smartblocks:loaded`,
           () =>
             window.roamjs?.extension.smartblocks &&
-            window.roamjs.extension.smartblocks.registerCommand(args)
+            window.roamjs.extension.smartblocks.registerCommand(elapCmd)
         );
-      }*/
+      }
       console.log('Elapsed Time Calculator loaded.');
     },
     onunload: () => {
