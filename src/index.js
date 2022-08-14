@@ -766,8 +766,8 @@ function convertMinutesTohhmm(time) {
 /*======================================================================================================*/
 
 function getParameters() {
-  if (categoriesUID != null) getTriggerWords(categoriesUID);
-  if (limitsUID != null) getLimits(limitsUID);
+  if (categoriesUID != null) getTriggerWords(normalizeUID(categoriesUID));
+  if (limitsUID != null) getLimits(normalizeUID(limitsUID));
   switch (flagsDropdown) {
     case "Color block tags (green/red)":
       limitFlag = getLimitFlags("Tags");
@@ -930,7 +930,8 @@ function registerPaletteCommands() {
   });
 }
 
-function registerSmartblocksCommands() {
+function registerSmartblocksCommands(extensionAPI) {
+  const panel = extensionAPI;
   const elapCmd = {
     text: "ELAPSEDTIME",
     help: "Calcul elapsed time between now an a timestamps at the beginning of the block",
@@ -947,16 +948,40 @@ function registerSmartblocksCommands() {
       return "";
     },
   };
+  const updCatCmd = {
+    text: "UPDATECATSFORET",
+    help: "Update categories/subcategories and parent block reference for Elapsed Time extension. 1. Block reference of the parent block.",
+    handler: (context) => () => {
+      categoriesUID = context.variables.triggerUID;
+      panel.settings.set("categoriesSetting", categoriesUID);
+      getTriggerWords(normalizeUID(categoriesUID));
+      return "";
+    },
+  };
+  const updLimCmd = {
+    text: "UPDATELIMITSFORET",
+    help: "Update Goals/Limits and parent block reference for Elapsed Time extension. 1. Block reference of the parent block.",
+    handler: (context) => () => {
+      limitsUID = context.variables.triggerUID;
+      panel.settings.set("limitsSetting", limitsUID);
+      getLimits(normalizeUID(limitsUID));
+      return "";
+    },
+  };
   if (window.roamjs?.extension?.smartblocks) {
     window.roamjs.extension.smartblocks.registerCommand(elapCmd);
     window.roamjs.extension.smartblocks.registerCommand(totalCmd);
+    window.roamjs.extension.smartblocks.registerCommand(updCatCmd);
+    window.roamjs.extension.smartblocks.registerCommand(updLimCmd);
   } else {
     document.body.addEventListener(
       `roamjs:smartblocks:loaded`,
       () =>
         window.roamjs?.extension.smartblocks &&
         window.roamjs.extension.smartblocks.registerCommand(elapCmd) &&
-        window.roamjs.extension.smartblocks.registerCommand(totalCmd)
+        window.roamjs.extension.smartblocks.registerCommand(totalCmd) &&
+        window.roamjs.extension.smartblocks.registerCommand(updCatCmd) &&
+        window.roamjs.extension.smartblocks.registerCommand(updLimCmd)
     );
   }
 }
@@ -1181,9 +1206,13 @@ export default {
     limitFormat = extensionAPI.settings.get("limitFormatSetting");
 
     registerPaletteCommands();
-    registerSmartblocksCommands();
+    registerSmartblocksCommands(extensionAPI);
     getParameters();
     console.log("Elapsed Time Calculator loaded.");
+
+    function setLimitUidInPanel(uid) {
+      extensionAPI.settings.set("limitsSetting", normalizeUID(uid));
+    }
   },
   onunload: () => {
     window.roamAlphaAPI.ui.commandPalette.removeCommand({
