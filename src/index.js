@@ -21,7 +21,7 @@ var categoriesUID,
   confirmPopup,
   defaultTimeLimit,
   totalTitle,
-  intervalSeparator,
+  intervalSeparator = " - ",
   durationFormat,
   totalFormat,
   limitFormat;
@@ -62,8 +62,9 @@ TriggerWord.prototype.addChildren = function (s, u, l, f) {
   return this.children.push(new TriggerWord(s, u, l, f));
 };
 TriggerWord.prototype.getOnlyWord = function (s) {
-  s = s.split("{")[0];
-  return s.trim();
+  //s = s.split("{")[0];
+  //return s.trim();
+  return s;
 };
 TriggerWord.prototype.getLimitByInterval = function (interval) {
   return [this.limit[interval], this.limit.type];
@@ -90,7 +91,7 @@ async function elapsedTime(blockUID) {
   let blockSplit = blockContent.split(":");
   let leftShift = getLeftShift(blockSplit[0]);
   let begin = new TimeStamp(blockContent.slice(leftShift, leftShift + 5));
-  let title;
+  let title = "";
   let endStr = getSecondTimestampStr(
     blockSplit,
     leftShift,
@@ -103,6 +104,7 @@ async function elapsedTime(blockUID) {
     endStr = addZero(d.getHours()) + ":" + addZero(d.getMinutes());
     title = blockContent.slice(leftShift + 5);
   }
+  if (title.length == 0) title = "";
   let end = new TimeStamp(endStr);
   //let elapsed = new TimeStamp(getDifferenceBetweenTwoTimeStamps(begin, end));
   let elapsed = getDifferenceBetweenTwoTimeStamps(begin, end);
@@ -110,6 +112,7 @@ async function elapsedTime(blockUID) {
     blockSplit[0].slice(0, -2) +
     concatTimeStamps(begin.tColon, end.tColon, elapsed);
   if (appendHourTag) hourTag = " #[[" + begin.h + ":00]]";
+
   let rightPart = title.trim() + hourTag;
   compareToLimitsAndUpdate(blockUID, title, leftPart, rightPart, elapsed);
 }
@@ -1009,6 +1012,7 @@ const panelConfig = {
         type: "input",
         onChange: (evt) => {
           categoriesUID = correctUidInput(evt.target.value);
+          extensionAPI.settings.set("categoriesSetting", categoriesUID);
           if (categoriesUID != null) getTriggerWords(categoriesUID);
         },
       },
@@ -1022,6 +1026,7 @@ const panelConfig = {
         type: "input",
         onChange: (evt) => {
           limitsUID = correctUidInput(evt.target.value);
+          extensionAPI.settings.set("limitsSetting", limitsUID);
           if (limitsUID != null) getLimits(limitsUID);
         },
       },
@@ -1104,6 +1109,7 @@ const panelConfig = {
         type: "input",
         onChange: (evt) => {
           intervalSeparator = evt.target.value;
+          extensionAPI.settings.set("intervalSetting", intervalSeparator);
         },
       },
     },
