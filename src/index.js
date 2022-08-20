@@ -25,7 +25,7 @@ var categoriesUID,
   durationFormat,
   totalFormat,
   limitFormat;
-var limitFlagDefault = {
+const limitFlagDefault = {
   task: {
     goal: { success: "🎯", failure: "⚠️" },
     limit: { success: "👍", failure: "🛑" },
@@ -62,9 +62,9 @@ TriggerWord.prototype.addChildren = function (s, u, l, f) {
   return this.children.push(new TriggerWord(s, u, l, f));
 };
 TriggerWord.prototype.getOnlyWord = function (s) {
-  //s = s.split("{")[0];
-  //return s.trim();
-  return s;
+  s = s.split("{")[0];
+  return s.trim();
+  //return s;
 };
 TriggerWord.prototype.getLimitByInterval = function (interval) {
   return [this.limit[interval], this.limit.type];
@@ -323,7 +323,19 @@ function compareToLimitsAndUpdate(
       } else leftPart = leftPart + badFormat;
     }
   }
+  rightPart = removePreviousDuration(rightPart);
   updateBlock(blockUID, leftPart + rightPart, true);
+}
+
+function removePreviousDuration(content) {
+  let dSplit = durationFormat.split("<d>");
+  let right = "";
+  if (dSplit.length > 1) {
+    right = dSplit[1];
+  }
+  let result = extractDelimitedNumberFromString(content, dSplit[0], right);
+  if (result != -1) content = content.replace(dSplit[0] + result + right, "");
+  return content.trim();
 }
 
 function scanTriggerWords(s, refs, callBack, once) {
@@ -472,6 +484,7 @@ function directChildrenProcess(tree) {
         dSplit[0],
         right
       );
+      if (result === -1 || result === "NaN") result = 0;
       //let triggerIndex = getTriggerIndex(blockContent);
       let refs = getBlocksUidReferencedInThisBlock(tree[i].uid);
       let triggerIndex = scanTriggerWords(
@@ -536,7 +549,7 @@ function directChildrenProcess(tree) {
 }
 
 function extractDelimitedNumberFromString(blockContent, before, after) {
-  let number = 0;
+  let number;
   if (blockContent.includes(after)) {
     let leftPart = blockContent.split(after)[0];
     if (leftPart.length > 0) {
@@ -544,16 +557,17 @@ function extractDelimitedNumberFromString(blockContent, before, after) {
       let length = splitted.length;
       if (length > 0) {
         let n = splitted[length - 1];
-        if (!isNaN(n)) {
+        if (!isNaN(n) && n != "") {
           number = parseInt(n);
+          return number;
         }
         if (isNaN(number)) {
-          number = 0;
+          return "NaN";
         }
       }
     }
   }
-  return number;
+  return -1;
 }
 
 function getTriggerIndexes(
@@ -814,6 +828,7 @@ function getTriggerWords(parentUid) {
       }
     }
   }
+  console.log(triggerTab);
 }
 
 function getLimits(uid) {
@@ -822,8 +837,7 @@ function getLimits(uid) {
     tree.forEach((limitType) => {
       if (limitType.string.toLowerCase().includes("goal")) {
         getLimitsInterval("goal", limitType.children);
-      }
-      if (limitType.string.toLowerCase().includes("limit")) {
+      } else if (limitType.string.toLowerCase().includes("limit")) {
         getLimitsInterval("limit", limitType.children);
       }
     });
@@ -836,8 +850,7 @@ function getLimitsInterval(type, tree) {
       let content = limitInterval.string.toLowerCase();
       if (content.includes("day")) {
         getLimitsByTypeAndInterval(type, "day", limitInterval.children);
-      }
-      if (content.includes("task")) {
+      } else if (content.includes("interval")) {
         getLimitsByTypeAndInterval(type, "task", limitInterval.children);
       }
     });
@@ -888,9 +901,9 @@ function getLimitFlags(type, input = "") {
     limitF = "#.exceeded-time";
   }
   if (type == "Customized") {
+    if (input === "") return limitFlagDefault;
     let splitInput = input.split(",");
-    console.log(splitInput);
-    if (!(splitInput.length == 2 || splitInput.length == 4))
+    if (!(splitInput.length === 2 || splitInput.length === 4))
       return limitFlagDefault;
     if (splitInput.length == 2) {
       goalS = splitInput[0];
@@ -1012,7 +1025,6 @@ const panelConfig = {
         type: "input",
         onChange: (evt) => {
           categoriesUID = correctUidInput(evt.target.value);
-          extensionAPI.settings.set("categoriesSetting", categoriesUID);
           if (categoriesUID != null) getTriggerWords(categoriesUID);
         },
       },
@@ -1026,7 +1038,6 @@ const panelConfig = {
         type: "input",
         onChange: (evt) => {
           limitsUID = correctUidInput(evt.target.value);
-          extensionAPI.settings.set("limitsSetting", limitsUID);
           if (limitsUID != null) getLimits(limitsUID);
         },
       },
@@ -1058,8 +1069,12 @@ const panelConfig = {
         type: "input",
         placeholder: "goal-success,goal-fail [,limit-success,limit-fail]",
         onChange: (evt) => {
-          if (evt.target.value.includes(","))
-            limitFlag = getLimitFlags("Customized", evt.target.value);
+          customFlags = evt.target.value;
+          if (customFlags.includes(","))
+            limitFlag = getLimitFlags("Customized", customFlags);
+          else {
+            limitFlag = limitFlagDefault;
+          }
         },
       },
     },
@@ -1109,7 +1124,6 @@ const panelConfig = {
         type: "input",
         onChange: (evt) => {
           intervalSeparator = evt.target.value;
-          extensionAPI.settings.set("intervalSetting", intervalSeparator);
         },
       },
     },
@@ -1215,10 +1229,6 @@ export default {
     registerSmartblocksCommands(extensionAPI);
     getParameters();
     console.log("Elapsed Time Calculator loaded.");
-
-    function setLimitUidInPanel(uid) {
-      extensionAPI.settings.set("limitsSetting", normalizeUID(uid));
-    }
   },
   onunload: () => {
     window.roamAlphaAPI.ui.commandPalette.removeCommand({

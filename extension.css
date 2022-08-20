@@ -1,0 +1,14 @@
+.exceeded-time > .rm-block__self,
+.insufficient-time > .rm-block__self {
+  background-color: #f8d7da;
+}
+
+.good-time > .rm-block__self {
+  background-color: #d2ffd4;
+}
+
+span.rm-page-ref[data-tag=".exceeded-time"],
+span.rm-page-ref[data-tag=".insufficient-time"],
+span.rm-page-ref[data-tag=".good-time"] {
+  display: none !important;
+}
