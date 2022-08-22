@@ -990,15 +990,16 @@ function registerSmartblocksCommands(extensionAPI) {
     window.roamjs.extension.smartblocks.registerCommand(updCatCmd);
     window.roamjs.extension.smartblocks.registerCommand(updLimCmd);
   } else {
-    document.body.addEventListener(
-      `roamjs:smartblocks:loaded`,
-      () =>
-        window.roamjs?.extension.smartblocks &&
-        window.roamjs.extension.smartblocks.registerCommand(elapCmd) &&
-        window.roamjs.extension.smartblocks.registerCommand(totalCmd) &&
-        window.roamjs.extension.smartblocks.registerCommand(updCatCmd) &&
-        window.roamjs.extension.smartblocks.registerCommand(updLimCmd)
-    );
+    document.body.addEventListener(`roamjs:smartblocks:loaded`, () => {
+      window.roamjs?.extension.smartblocks &&
+        window.roamjs.extension.smartblocks.registerCommand(elapCmd);
+      window.roamjs?.extension.smartblocks &&
+        window.roamjs.extension.smartblocks.registerCommand(totalCmd);
+      window.roamjs?.extension.smartblocks &&
+        window.roamjs.extension.smartblocks.registerCommand(updCatCmd);
+      window.roamjs?.extension.smartblocks &&
+        window.roamjs.extension.smartblocks.registerCommand(updLimCmd);
+    });
   }
 }
 
