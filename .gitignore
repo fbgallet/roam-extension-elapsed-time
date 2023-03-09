@@ -1,6 +1,4 @@
-extension.js
+node_modules
 main.js
+extension.js
 .env
-
-# Dependency directories
-node_modules/
