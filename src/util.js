@@ -115,10 +115,12 @@ export function getWeek(date = null) {
 }
 
 export function addZero(i) {
-  if (i < 10) {
-    i = "0" + i;
+  if (isNaN(i) && i.charAt(0) === "0") return i;
+  let nb = parseInt(i);
+  if (nb < 10) {
+    nb = "0" + nb;
   }
-  return i;
+  return nb;
 }
 
 export function extractDelimitedNumberFromString(blockContent, before, after) {

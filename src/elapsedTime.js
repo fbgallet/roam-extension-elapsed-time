@@ -29,41 +29,54 @@ var pomoIsLimit = true; // Pomodotor timer as min trigger
 var appendHourTag = false; // add a tag with the round current hour, like #19:00
 /**********************************************************************/
 
+const timestampRegex = /[0-9]{1,2}:[0-9]{1,2}/g;
 class TimeStamp {
-  constructor(tColon) {
-    this.tColon = tColon;
-    this.m = parseInt(tColon.slice(-2));
-    this.h = parseInt(tColon.slice(0, 2));
-    this.mTotal = this.h * 60 + this.m;
+  constructor(stringTT) {
+    this.original = stringTT;
+    let splited = stringTT.split(":");
+    this.h = splited[0];
+    this.m = splited[1];
+    this.normalizedTT = addZero(this.h) + ":" + addZero(this.m);
+    this.mTotal = parseInt(this.h) * 60 + parseInt(this.m);
+  }
+
+  getInterval(end) {
+    let difference = end.mTotal - this.mTotal;
+    if (difference < 0) difference = 1440 + difference;
+    return difference;
+  }
+
+  concatWithAnotherTimeStamp(end, separator) {
+    return this.normalizedTT + separator + end.normalizedTT;
   }
 }
 
 export async function elapsedTime(blockUID) {
   let hourTag = "";
   let blockContent = getBlockContent(blockUID);
-  let blockSplit = blockContent.split(":");
-  let leftShift = getLeftShift(blockSplit[0]);
-  let begin = new TimeStamp(blockContent.slice(leftShift, leftShift + 5));
+  // let blockSplit = blockContent.split(":");
+  // let leftShift = getLeftShift(blockSplit[0]);
+  let matchingTT = [...blockContent.matchAll(timestampRegex)];
+  //let begin = new TimeStamp(blockContent.slice(leftShift, leftShift + 5));
+  if (!matchingTT) return;
+  let begin = new TimeStamp(matchingTT[0][0]);
+  let end;
   let title = "";
-  let endStr = getSecondTimestampStr(
-    blockSplit,
-    leftShift,
-    blockContent.search(intervalSeparator.trim())
-  );
-  if (endStr != null) {
-    title = blockContent.slice(blockSplit[0].length + blockSplit[1].length + 5);
+  if (matchingTT.length > 1) {
+    title = blockContent.slice(matchingTT[1].index + matchingTT[1][0].length);
+    end = new TimeStamp(matchingTT[1][0]);
   } else {
     let d = new Date();
-    endStr = addZero(d.getHours()) + ":" + addZero(d.getMinutes());
-    title = blockContent.slice(leftShift + 5);
+    end = new TimeStamp(d.getHours() + ":" + d.getMinutes());
+    title = blockContent.slice(matchingTT[0].index + matchingTT[0][0].length);
   }
-  if (title.length == 0) title = "";
-  let end = new TimeStamp(endStr);
-  //let elapsed = new TimeStamp(getDifferenceBetweenTwoTimeStamps(begin, end));
-  let elapsed = getDifferenceBetweenTwoTimeStamps(begin, end);
+  let elapsed = begin.getInterval(end);
   let leftPart =
-    blockSplit[0].slice(0, -2) +
-    concatTimeStamps(begin.tColon, end.tColon, elapsed);
+    blockContent.slice(0, matchingTT[0].index) +
+    begin.concatWithAnotherTimeStamp(end, intervalSeparator) +
+    " " +
+    durationFormat.replace("<d>", elapsed) +
+    " ";
   if (appendHourTag) hourTag = " #[[" + begin.h + ":00]]";
 
   let rightPart = title.trim() + hourTag;
@@ -304,47 +317,4 @@ function extractLimit(s, shift) {
     i++;
   }
   return t;
-}
-
-function getLeftShift(firstSplit) {
-  let shift = firstSplit.length - 2;
-  if (shift < 0) shift = 0;
-  return shift;
-}
-
-function getSecondTimestampStr(split, shift, sepIndex) {
-  if (split.length > 2) {
-    let h = parseInt(split[1].slice(-2));
-    let m = parseInt(split[2].slice(0, 2));
-    let hasSndTime = isNaN(h) == false && isNaN(m) == false;
-    if (sepIndex >= shift + 5 && sepIndex < shift + 7 && hasSndTime)
-      return getNormalizedTimestamp(h, m);
-  }
-  return null;
-}
-
-function getDifferenceBetweenTwoTimeStamps(begin, end) {
-  let difference = end.mTotal - begin.mTotal;
-  if (difference < 0) difference = 1440 + difference;
-  return difference;
-  /* version returning another timestamp
-  let h = end.h - begin.h;
-  if (h < 0) h = 24 - begin.h + end.h;
-  let m = end.m - begin.m;
-  if (m < 0) {
-    m = 60 + m;
-    h -= 1;
-  }
-  return getNormalizedTimestamp(h, m);*/
-}
-
-function concatTimeStamps(begin, end, elapsed) {
-  return (
-    begin +
-    intervalSeparator +
-    end +
-    " " +
-    durationFormat.replace("<d>", elapsed) +
-    " "
-  );
 }
