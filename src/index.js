@@ -8,7 +8,9 @@ import {
   totalTime,
 } from "./totalTime";
 import {
+  escapeCharacters,
   getChildrenTree,
+  getRegexFromArray,
   getStringsAroundPlaceHolder,
   normalizeUID,
 } from "./util";
@@ -22,6 +24,7 @@ export var confirmPopup,
   totalTitle,
   intervalSeparator = " - ",
   durationFormat,
+  durationRegex,
   splittedDurationFormat,
   totalFormat,
   limitFormat;
@@ -42,10 +45,12 @@ const TYPE = {
   blockRef: "blockRef",
 };
 
-export var triggerTab = [];
+export var categoriesArray = [];
+export var categoriesNames = [];
+export var categoriesRegex;
 
-class TriggerWord {
-  constructor(s, uid, l, f) {
+class Category {
+  constructor(s, uid, l, f, parent = null) {
     this.name = s;
     this.uid = uid;
     this.display = true;
@@ -54,9 +59,10 @@ class TriggerWord {
     this.time = 0;
     this.format = f;
     this.children = [];
+    this.parent = parent;
   }
   addChildren(s, u, l, f) {
-    return this.children.push(new TriggerWord(s, u, l, f));
+    return this.children.push(new Category(s, u, l, f));
   }
   getOnlyWord(s) {
     s = s.split("{")[0];
@@ -77,6 +83,23 @@ class TriggerWord {
     this.limit.type = type;
     this.limit[interval] = time;
   }
+  addChildrenTime() {
+    this.children.forEach((child) => {
+      child.addChildrenTime();
+      this.time += child.time;
+    });
+  }
+  isParentOf(tw) {
+    if (this.children.filter((child) => tw.uid === child.uid).length != 0)
+      return true;
+    else return false;
+  }
+  hasChildrenWithName(name) {
+    return this.children.find((child) => child.name === name) != undefined;
+  }
+  getChildrenWithName(name) {
+    return this.children.find((child) => child.name === name);
+  }
 }
 
 /*======================================================================================================*/
@@ -84,7 +107,7 @@ class TriggerWord {
 /*======================================================================================================*/
 
 function getParameters() {
-  if (categoriesUID != null) getTriggerWords(normalizeUID(categoriesUID));
+  if (categoriesUID != null) getCategories(normalizeUID(categoriesUID));
   if (limitsUID != null) getLimits(normalizeUID(limitsUID));
   switch (flagsDropdown) {
     case "Color block tags (green/red)":
@@ -98,12 +121,12 @@ function getParameters() {
   }
 }
 
-export function scanTriggerWords(s, refs, callBack, once) {
+export function scanCategories(s, refs, callBack, once) {
   let result = [];
   let hasCat = false;
   let tag = "";
   s = s.toLowerCase();
-  triggerTab.forEach((cat, i) => {
+  categoriesArray.forEach((cat, i) => {
     if (refs.includes(cat.uid) || s.includes(cat.name.toLowerCase())) {
       result = callBack(cat, i, -1, result);
       hasCat = true;
@@ -135,7 +158,8 @@ export function scanTriggerWords(s, refs, callBack, once) {
   return result;
 }
 
-function getTriggerWords(parentUid) {
+function getCategories(parentUid) {
+  categoriesArray = [];
   let triggerTree = getChildrenTree(parentUid);
 
   if (triggerTree) {
@@ -146,27 +170,38 @@ function getTriggerWords(parentUid) {
         hide = true;
         w.string = w.string.replace("{hide}", "");
       }
-      triggerTab.push(new TriggerWord(w.string, w.uid, null, ""));
+      let topTrigger = new Category(w.string, w.uid, null, "");
+      categoriesArray.push(topTrigger);
       if (w.children) {
-        for (let j = 0; j < w.children.length; j++) {
-          let hideSub = false;
-          let t = w.children[j].string;
-          if (t.includes("{hide}")) {
-            t = t.replace("{hide}", "");
-            hideSub = true;
-          }
-          let format = "";
-          triggerTab[i].addChildren(t, w.children[j].uid, "", format);
-          if (hide || hideSub) {
-            triggerTab[i].children[
-              triggerTab[i].children.length - 1
-            ].display = false;
-          }
-        }
+        getSubCategories(w.children, topTrigger, hide);
       }
     }
+    categoriesNames = categoriesArray.map((trigger) => trigger.name);
+    categoriesRegex = getRegexFromArray(categoriesNames);
   }
-  console.log(triggerTab);
+  console.log(categoriesArray);
+  console.log(categoriesNames);
+
+  function getSubCategories(tree, topTrigger, hideTop) {
+    for (let j = 0; j < tree.length; j++) {
+      let hideSub = false;
+      let t = tree[j].string;
+      if (t.includes("{hide}")) {
+        t = t.replace("{hide}", "");
+        hideSub = true;
+      }
+      let format = "";
+      //supTrigger.addChildren(t, w.children[j].uid, "", format);
+      let subTrigger = new Category(t, tree[j].uid, "", format, topTrigger);
+      topTrigger.children.push(subTrigger);
+      categoriesArray.push(subTrigger);
+      if (hideTop || hideSub) {
+        topTrigger.children[topTrigger.children.length - 1].display = false;
+      }
+      if (tree[j].children)
+        getSubCategories(tree[j].children, subTrigger, hideSub);
+    }
+  }
 }
 
 function getLimits(uid) {
@@ -202,7 +237,7 @@ function getLimitsByTypeAndInterval(type, interval, tree) {
         let duration = limitDuration.string.replace(/[^0-9]+/g, "");
         if (!isNaN(duration)) {
           limitDuration.children.forEach((catRef) => {
-            let tw = triggerTab.find(
+            let tw = categoriesArray.find(
               (item) => item.uid === catRef.string.slice(2, -2)
             );
             if (tw == undefined)
@@ -217,8 +252,8 @@ function getLimitsByTypeAndInterval(type, interval, tree) {
 }
 
 function searchSubCatByUidOrWord(value, attr) {
-  for (let i = 0; i < triggerTab.length; i++) {
-    let subCat = triggerTab[i].children;
+  for (let i = 0; i < categoriesArray.length; i++) {
+    let subCat = categoriesArray[i].children;
     if (subCat) {
       let tw = subCat.find((item) => item[attr] === value);
       if (tw != undefined) {
@@ -265,6 +300,15 @@ function getLimitFlags(type, input = "") {
       limit: { success: limitS, failure: limitF },
     },
   });
+}
+
+function setDurationRegex() {
+  durationRegex = new RegExp(
+    `${escapeCharacters(splittedDurationFormat[0])}([0-9]*)${escapeCharacters(
+      splittedDurationFormat[1]
+    )}`
+  );
+  console.log(durationRegex);
 }
 
 function registerPaletteCommands() {
@@ -323,7 +367,7 @@ function registerSmartblocksCommands(extensionAPI) {
     handler: (context) => () => {
       categoriesUID = context.variables.triggerUID;
       panel.settings.set("categoriesSetting", categoriesUID);
-      getTriggerWords(normalizeUID(categoriesUID));
+      getCategories(normalizeUID(categoriesUID));
       return "";
     },
   };
@@ -379,7 +423,7 @@ const panelConfig = {
         type: "input",
         onChange: (evt) => {
           categoriesUID = correctUidInput(evt.target.value);
-          if (categoriesUID != null) getTriggerWords(categoriesUID);
+          if (categoriesUID != null) getCategories(categoriesUID);
         },
       },
     },
@@ -495,6 +539,7 @@ const panelConfig = {
             durationFormat,
             "<d>"
           );
+          setDurationRegex();
         },
       },
     },
@@ -568,6 +613,7 @@ export default {
       extensionAPI.settings.set("durationSetting", "(**<d>'**)");
     durationFormat = extensionAPI.settings.get("durationSetting");
     splittedDurationFormat = getStringsAroundPlaceHolder(durationFormat, "<d>");
+    setDurationRegex();
     if (extensionAPI.settings.get("totalTitleSetting") == null)
       extensionAPI.settings.set("totalTitleSetting", "Total time: **(<th>)**");
     totalTitle = extensionAPI.settings.get("totalTitleSetting");

@@ -1,13 +1,15 @@
 import {
   displaySubCat,
   durationFormat,
+  durationRegex,
   limitFlag,
   limitFormat,
-  scanTriggerWords,
+  scanCategories,
   splittedDurationFormat,
   totalFormat,
   totalTitle,
-  triggerTab,
+  categoriesRegex,
+  categoriesArray,
 } from ".";
 import {
   convertMinutesTohhmm,
@@ -18,10 +20,16 @@ import {
   getMainPageUid,
   getPageUidByTitle,
   getParentUID,
+  getRegexFromArray,
   getWeek,
   getYesterdayDate,
 } from "./util";
 
+const pomodoroRegex = /\{\{\[?\[?POMO\]?\]?: ?([0-9]*)\}\}/;
+const totalPomo = {
+  nb: 0,
+  time: 0,
+};
 var titleIsRef = true; // Trigger words are inserted as block references in Total display
 var uncategorized;
 
@@ -50,40 +58,161 @@ export function totalTime(currentUID) {
 
 function resetTotalTimes() {
   uncategorized = 0;
-  for (let i = 0; i < triggerTab.length; i++) {
-    triggerTab[i].time = 0;
-    if (triggerTab[i].children) {
-      for (let j = 0; j < triggerTab[i].children.length; j++) {
-        triggerTab[i].children[j].time = 0;
+  for (let i = 0; i < categoriesArray.length; i++) {
+    categoriesArray[i].time = 0;
+    if (categoriesArray[i].children) {
+      for (let j = 0; j < categoriesArray[i].children.length; j++) {
+        categoriesArray[i].children[j].time = 0;
       }
     }
   }
 }
 
-function directChildrenProcess(tree) {
+function directChildrenProcess(tree, parentBlockCat = null) {
   let total = 0;
+  //console.log(categoriesArray);
   if (tree) {
     let length = tree.length;
     for (let i = 0; i < length; i++) {
       let blockContent = tree[i].string;
-      let result = extractDelimitedNumberFromString(
-        blockContent,
-        ...splittedDurationFormat
-      );
-      if (result === -1 || result === "NaN") result = 0;
+      let time = extractElapsedTime(blockContent);
+      let pomo = extractPomodoro(blockContent);
+      if (pomo) {
+        totalPomo.nb++;
+        totalPomo.time += parseInt(pomo[1]);
+      }
+      if (!time) time = pomo ? pomo[1] : null;
+      //console.log(categoriesRegex);
+      //let matchingWords = [...blockContent.matchAll(categoriesRegex)];
+      let matchingWords = blockContent.match(categoriesRegex);
+      // TODO getSubCats from parentBlockCat
+      let triggeredCat = [];
+      console.log("matchingWords");
+      console.log(matchingWords);
+      if (matchingWords)
+        triggeredCat = getTriggeredCategoriesFromNames(
+          matchingWords,
+          parentBlockCat
+        );
+      if (!time) parentBlockCat = triggeredCat ? triggeredCat[0] : null;
+      else {
+        // TODO : add Time to cats
+
+        console.log("triggeredCat");
+      }
+      console.log(triggeredCat);
+      if (tree[i].children) {
+        console.log("parentBlockCat");
+        console.log(parentBlockCat);
+        directChildrenProcess(tree[i].children, parentBlockCat);
+      }
+      //console.log(matchingWords);
       //let triggerIndex = getTriggerIndex(blockContent);
-      let refs = getBlocksUidReferencedInThisBlock(tree[i].uid);
-      let triggerIndex = scanTriggerWords(
-        blockContent,
-        refs,
-        getTriggerIndexes,
-        false
-      );
-      addTimeToTriggerWord(triggerIndex, result);
-      total += result;
+      // let refs = getBlocksUidReferencedInThisBlock(tree[i].uid);
+      // if (!triggerIndex)
+      //   triggerIndex = scanCategories(
+      //     blockContent,
+      //     refs,
+      //     getTriggerIndexes,
+      //     false
+      //   );
+      // if (result != 0) {
+      //   addTimeToCategorie(triggerIndex, result);
+      //   total += result;
+      // } else {
+      //   if (triggerIndex[0][0] != -1 && tree[i].children) {
+      //     let subTotal = directChildrenProcess(tree[i].children);
+      //     console.log(blockContent);
+      //     console.log(triggerIndex);
+      //     console.log(subTotal);
+      //     total += subTotal;
+      //   }
+      // }
     }
   }
   return total;
+}
+
+function getTriggeredCategoriesFromNames(names, parentBlockCat) {
+  let result = [];
+  if (parentBlockCat) {
+    console.log(parentBlockCat);
+    let child = names.find((name) => parentBlockCat.hasChildrenWithName(name));
+    console.log("child of parent block");
+    console.log(child);
+    if (child) {
+      result.push(parentBlockCat.getChildrenWithName(child));
+      names = names.filter((name) => name != child);
+    }
+  }
+  if (names.length > 0) {
+    let catAndPossiblesCat = [].concat(
+      ...names.map((name) => {
+        let possibleCategories = categoriesArray.filter(
+          (cat) => cat.name === name
+        );
+        let test = null;
+        if (possibleCategories) return possibleCategories;
+        //   test = possibleCategories.map((cat) => {
+        //     if (names.includes(cat.parent?.name)) return [cat.parent, cat];
+        //   });
+        // if (test) return test;
+      })
+    );
+    //console.log(catAndPossiblesCat);
+    if (catAndPossiblesCat) {
+      // catAndPossiblesCat.forEach
+      result = result.concat(getTriggeredCategories(catAndPossiblesCat));
+      // console.log("Block result:");
+      // console.log(result);
+    }
+  }
+  return result;
+  // let newArray = names.map((name) => {
+  //   let possibleCategories = categoriesArray.filter((cat) => cat.name === name);
+  //   if (possibleCategories)
+  // });
+}
+
+function getTriggeredCategories(filteredArray) {
+  let result = [];
+  let lastName = "";
+  while (filteredArray.length > 1) {
+    let child = filteredArray
+      .slice(1)
+      .filter((tw) => filteredArray[0].isParentOf(tw));
+    // console.log("child:");
+    // console.log(child);
+    if (child.length != 0) {
+      child = child[0];
+      result.push(child);
+      filteredArray = filteredArray
+        .slice(1)
+        .filter((tw) => tw.name !== child.name);
+    } else {
+      result = addOnlySupCatIfSynonym(filteredArray[0], lastName, result);
+      lastName = filteredArray[0].name;
+      filteredArray = filteredArray.slice(1);
+    }
+  }
+  if (filteredArray.length === 1) {
+    result = addOnlySupCatIfSynonym(filteredArray[0], lastName, result);
+    filteredArray = filteredArray.slice(1);
+  }
+  return result;
+}
+
+function addOnlySupCatIfSynonym(cat, lastCatName, catArray) {
+  if (cat.name !== lastCatName) {
+    catArray.push(cat);
+  } else {
+    if (!cat.parent) catArray[catArray.length - 1] = cat;
+  }
+  return catArray;
+}
+
+function extractPomodoro(content) {
+  return content.match(pomodoroRegex);
 }
 
 function getTriggerIndexes(
@@ -195,28 +324,28 @@ class Output {
 function getTriggeredTime(t) {
   let totalOutput = new Output(t);
   let cat = [];
-  for (let i = 0; i < triggerTab.length; i++) {
-    if (triggerTab[i].time != 0) {
+  for (let i = 0; i < categoriesArray.length; i++) {
+    if (categoriesArray[i].time != 0) {
       let title;
-      if (titleIsRef && triggerTab[i].type === "text") {
-        title = "((" + triggerTab[i].uid + "))";
+      if (titleIsRef && categoriesArray[i].type === "text") {
+        title = "((" + categoriesArray[i].uid + "))";
       } else {
-        title = triggerTab[i].name;
+        title = categoriesArray[i].name;
       }
       let hideTime = false;
-      //if (displaySubCat && triggerTab[i].children.length === 1) hideTime = true;
+      //if (displaySubCat && categoriesArray[i].children.length === 1) hideTime = true;
       let formatedCatTotal = formatDisplayTime(
-        triggerTab[i],
+        categoriesArray[i],
         title,
-        triggerTab[i].format,
+        categoriesArray[i].format,
         hideTime
       );
       let catOutput = new Output(formatedCatTotal);
       cat.push(catOutput);
       let sub = [];
       if (displaySubCat) {
-        for (let j = 0; j < triggerTab[i].children.length; j++) {
-          let child = triggerTab[i].children[j];
+        for (let j = 0; j < categoriesArray[i].children.length; j++) {
+          let child = categoriesArray[i].children[j];
           if (child.time != 0 && child.display) {
             if (titleIsRef && child.type === "text") {
               title = "((" + child.uid + "))";
@@ -422,7 +551,7 @@ export function getTotaTimeInDailyLog(dayLog) {
   console.log(dayTree);
   let stringified = JSON.stringify(dayTree); //.split('"string":"');
   if (dayLog.target && !stringified.includes(dayLog.target)) return 0;
-  if (containsElapsedTimes(stringified)) {
+  if (extractElapsedTime(stringified)) {
     let total = getTimesFromArray(stringified.split('"string":"'), dayLog);
     return total;
   } else return 0;
@@ -432,11 +561,8 @@ function getTimesFromArray(array, dayLog) {
   let total = 0;
   uncategorized = 0;
   array.forEach((block) => {
-    let result = extractDelimitedNumberFromString(
-      block,
-      ...splittedDurationFormat
-    );
-    if (result === -1 || result === "NaN") result = 0;
+    let result = extractElapsedTime(block);
+    if (!result) result = 0;
     else {
       if (dayLog.target) {
         if (!block.includes(dayLog.target)) result = 0;
@@ -445,13 +571,13 @@ function getTimesFromArray(array, dayLog) {
         let refs = null;
         if (uidSlice.length > 1)
           refs = getBlocksUidReferencedInThisBlock(uidSlice[1].slice(0, 9));
-        let triggerIndex = scanTriggerWords(
+        let triggerIndex = scanCategories(
           block,
           refs,
           getTriggerIndexes,
           false
         );
-        addTimeToTriggerWord(triggerIndex, result, dayLog);
+        addTimeToCategory(triggerIndex, result, dayLog);
       }
     }
     total += result;
@@ -459,7 +585,7 @@ function getTimesFromArray(array, dayLog) {
   return total;
 }
 
-function addTimeToTriggerWord(triggerIndex, result, dayLog = null) {
+function addTimeToCategory(triggerIndex, result, dayLog = null) {
   if (triggerIndex.length > 0) {
     if (triggerIndex[0][0] == -1) {
       uncategorized += result;
@@ -470,7 +596,7 @@ function addTimeToTriggerWord(triggerIndex, result, dayLog = null) {
       let isOnlyTag = false;
       for (let j = 0; j < triggerIndex.length; j++) {
         let index = triggerIndex[j];
-        let cat = triggerTab[index[0]];
+        let cat = categoriesArray[index[0]];
         if (index[0] != lastCat) {
           hasCatTag = false;
         }
@@ -486,7 +612,7 @@ function addTimeToTriggerWord(triggerIndex, result, dayLog = null) {
               for (let k = 0; k < splLeft.length - 1; k++) {
                 let splRight = splLeft[k].split("[");
                 let catIndex = splRight[splRight.length - 1];
-                if (triggerTab[catIndex].name == sub.name) {
+                if (categoriesArray[catIndex].name == sub.name) {
                   isOnlyTag = true;
                 }
               }
@@ -516,15 +642,6 @@ function addTimeToTriggerWord(triggerIndex, result, dayLog = null) {
   }
 }
 
-function containsElapsedTimes(string) {
-  let elapsedTime = extractDelimitedNumberFromString(
-    string,
-    ...splittedDurationFormat
-  );
-  if (elapsedTime === -1 || elapsedTime === "NaN") return false;
-  else return true;
-}
-
 export async function getTotalTimeForCurrentPage() {
   //let pageTitle = getMainPageUid
   let pageUid = getPageUidByTitle("piano");
@@ -551,8 +668,16 @@ function getBlocksContentWithDuration(b) {
   let dFormat = [...splittedDurationFormat];
   for (let i = 0; i < b.length; i++) {
     if (b[i][1].includes(dFormat[0]) && b[i][1].includes(dFormat[1])) {
-      tab.push(extractDelimitedNumberFromString(b[i][1], ...dFormat));
+      tab.push(extractElapsedTime(b[i][1]));
     }
   }
   return tab;
+}
+
+function extractElapsedTime(content) {
+  let match = content.match(durationRegex);
+  if (match) {
+    return match[1];
+  }
+  return null;
 }

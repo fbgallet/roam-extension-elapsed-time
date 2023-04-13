@@ -14,7 +14,7 @@ import {
   durationFormat,
   intervalSeparator,
   limitFlag,
-  scanTriggerWords,
+  scanCategories,
 } from ".";
 
 /*======================================================================================================*/
@@ -123,13 +123,8 @@ function compareToLimitsAndUpdate(
   let limitType = "Goal or limit";
   if (limitPresets && !withMin && !withMax && !withPomo) {
     let refs = getBlocksUidReferencedInThisBlock(blockUID);
-    //let limitTab = getLimitOfFirstTriggerWord(rightPart.toLowerCase(), refs);
-    let limitTab = scanTriggerWords(
-      rightPart,
-      refs,
-      getLimitFromTriggerWord,
-      true
-    );
+    //let limitTab = getLimitOfFirstCategorie(rightPart.toLowerCase(), refs);
+    let limitTab = scanCategories(rightPart, refs, getLimitFromCategorie, true);
     let timeLimit = limitTab[0];
     if (timeLimit > 0) {
       limitType = limitTab[1];
@@ -304,7 +299,7 @@ function removePreviousDuration(content) {
   return content.trim();
 }
 
-function getLimitFromTriggerWord(tw, i = 0, j = 0) {
+function getLimitFromCategorie(tw, i = 0, j = 0) {
   if (tw == null) return [i, j];
   return tw.getLimitByInterval("task");
 }

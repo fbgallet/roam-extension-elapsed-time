@@ -1,3 +1,5 @@
+import { durationRegex } from ".";
+
 export function getTreeByPageTitle(pageTitle) {
   return window.roamAlphaAPI.q(`[:find ?uid ?s 
 							   :where [?b :node/title "${pageTitle}"]
@@ -125,23 +127,28 @@ export function addZero(i) {
 
 export function extractDelimitedNumberFromString(blockContent, before, after) {
   let number;
-  if (blockContent.includes(after)) {
-    let leftPart = blockContent.split(after)[0];
-    if (leftPart.length > 0) {
-      let splitted = leftPart.split(before);
-      let length = splitted.length;
-      if (length > 0) {
-        let n = splitted[length - 1];
-        if (!isNaN(n) && n != "") {
-          number = parseInt(n);
-          return number;
-        }
-        if (isNaN(number)) {
-          return "NaN";
-        }
-      }
-    }
+  let match = blockContent.match(durationRegex);
+  console.log(match);
+  if (match) {
+    return match[1];
   }
+  // if (blockContent.includes(after)) {
+  //   let leftPart = blockContent.split(after)[0];
+  //   if (leftPart.length > 0) {
+  //     let splitted = leftPart.split(before);
+  //     let length = splitted.length;
+  //     if (length > 0) {
+  //       let n = splitted[length - 1];
+  //       if (!isNaN(n) && n != "") {
+  //         number = parseInt(n);
+  //         return number;
+  //       }
+  //       if (isNaN(number)) {
+  //         return "NaN";
+  //       }
+  //     }
+  //   }
+  // }
   return -1;
 }
 
@@ -151,4 +158,20 @@ export function getStringsAroundPlaceHolder(string, placeholder) {
   let right;
   split.length > 1 ? (right = split[1]) : (right = "");
   return [left, right];
+}
+
+export function getSingleRegexFromArray(arr) {
+  const regexStr = arr.join("");
+  const regex = new RegExp(`${regexStr}`, "g");
+  return regex;
+}
+
+export function getRegexFromArray(arr) {
+  const regexStr = arr.map((str) => escapeCharacters(str)).join("|");
+  const regex = new RegExp(`${regexStr}`, "gi");
+  return regex;
+}
+
+export function escapeCharacters(str) {
+  return str.replaceAll(/[.*+?^${}()|\[\]\\]/g, "\\$&");
 }
