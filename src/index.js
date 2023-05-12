@@ -83,6 +83,10 @@ class Category {
     this.limit.type = type;
     this.limit[interval] = time;
   }
+  addTime(time) {
+    this.time += time;
+    if (this.parent) this.parent.addTime(time);
+  }
   addChildrenTime() {
     this.children.forEach((child) => {
       child.addChildrenTime();

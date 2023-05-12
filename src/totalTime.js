@@ -37,7 +37,7 @@ var uncategorized;
 /* TOTAL TIME ON DNP
 /*======================================================================================================*/
 
-export function totalTime(currentUID) {
+export async function totalTime(currentUID) {
   let total = 0;
   resetTotalTimes();
   let parentUID;
@@ -49,11 +49,15 @@ export function totalTime(currentUID) {
     parentUID = getParentUID(currentUID);
     blockTree = getChildrenTree(parentUID);
   }
-  total = directChildrenProcess(blockTree);
-  let displayTotal = formatDisplayTime({ time: total }, "", "");
-  let totalOutput = getTriggeredTime(displayTotal);
-  let totalUid = insertTotalTime(currentUID, totalOutput.text, position);
-  insertTriggeredTime(totalUid, totalOutput);
+  total = await directChildrenProcess(blockTree);
+  let displayTotal = await formatDisplayTime({ time: total }, "", "");
+  let totalOutput = await getTotalTimeOutput(displayTotal);
+  let totalUid = prepareTotalTimeInsersion(
+    currentUID,
+    totalOutput.text,
+    position
+  );
+  insertTotalTimeByCategory(totalUid, totalOutput);
 }
 
 function resetTotalTimes() {
@@ -68,13 +72,15 @@ function resetTotalTimes() {
   }
 }
 
-function directChildrenProcess(tree, parentBlockCat = null) {
+async function directChildrenProcess(tree, parentBlockCat = null) {
   let total = 0;
   //console.log(categoriesArray);
   if (tree) {
     let length = tree.length;
     for (let i = 0; i < length; i++) {
+      let processChildren = true;
       let blockContent = tree[i].string;
+      console.log(blockContent);
       let time = extractElapsedTime(blockContent);
       let pomo = extractPomodoro(blockContent);
       if (pomo) {
@@ -86,48 +92,32 @@ function directChildrenProcess(tree, parentBlockCat = null) {
       //let matchingWords = [...blockContent.matchAll(categoriesRegex)];
       let matchingWords = blockContent.match(categoriesRegex);
       // TODO getSubCats from parentBlockCat
-      let triggeredCat = [];
-      console.log("matchingWords");
-      console.log(matchingWords);
-      if (matchingWords)
+      let triggeredCat;
+      if (matchingWords) {
+        // console.log("matchingWords");
+        // console.log(matchingWords);
         triggeredCat = getTriggeredCategoriesFromNames(
           matchingWords,
           parentBlockCat
         );
-      if (!time) parentBlockCat = triggeredCat ? triggeredCat[0] : null;
-      else {
-        // TODO : add Time to cats
-
-        console.log("triggeredCat");
       }
-      console.log(triggeredCat);
-      if (tree[i].children) {
+      if (!time) {
+        if (!hasElapsedTimeInChildren(tree[i].children)) {
+          processChildren = false;
+        }
+        parentBlockCat = triggeredCat ? triggeredCat[0] : parentBlockCat;
+      } else {
+        time = parseInt(time);
+        if (triggeredCat) triggeredCat.forEach((cat) => cat.addTime(time));
+        else if (parentBlockCat) parentBlockCat.addTime(time);
+        else uncategorized += time;
+        processChildren = false;
+      }
+      if (processChildren && tree[i].children) {
         console.log("parentBlockCat");
         console.log(parentBlockCat);
         directChildrenProcess(tree[i].children, parentBlockCat);
       }
-      //console.log(matchingWords);
-      //let triggerIndex = getTriggerIndex(blockContent);
-      // let refs = getBlocksUidReferencedInThisBlock(tree[i].uid);
-      // if (!triggerIndex)
-      //   triggerIndex = scanCategories(
-      //     blockContent,
-      //     refs,
-      //     getTriggerIndexes,
-      //     false
-      //   );
-      // if (result != 0) {
-      //   addTimeToCategorie(triggerIndex, result);
-      //   total += result;
-      // } else {
-      //   if (triggerIndex[0][0] != -1 && tree[i].children) {
-      //     let subTotal = directChildrenProcess(tree[i].children);
-      //     console.log(blockContent);
-      //     console.log(triggerIndex);
-      //     console.log(subTotal);
-      //     total += subTotal;
-      //   }
-      // }
     }
   }
   return total;
@@ -136,10 +126,9 @@ function directChildrenProcess(tree, parentBlockCat = null) {
 function getTriggeredCategoriesFromNames(names, parentBlockCat) {
   let result = [];
   if (parentBlockCat) {
-    console.log(parentBlockCat);
     let child = names.find((name) => parentBlockCat.hasChildrenWithName(name));
-    console.log("child of parent block");
-    console.log(child);
+    // console.log("child of parent block");
+    // console.log(child);
     if (child) {
       result.push(parentBlockCat.getChildrenWithName(child));
       names = names.filter((name) => name != child);
@@ -151,7 +140,7 @@ function getTriggeredCategoriesFromNames(names, parentBlockCat) {
         let possibleCategories = categoriesArray.filter(
           (cat) => cat.name === name
         );
-        let test = null;
+        //let test = null;
         if (possibleCategories) return possibleCategories;
         //   test = possibleCategories.map((cat) => {
         //     if (names.includes(cat.parent?.name)) return [cat.parent, cat];
@@ -168,10 +157,6 @@ function getTriggeredCategoriesFromNames(names, parentBlockCat) {
     }
   }
   return result;
-  // let newArray = names.map((name) => {
-  //   let possibleCategories = categoriesArray.filter((cat) => cat.name === name);
-  //   if (possibleCategories)
-  // });
 }
 
 function getTriggeredCategories(filteredArray) {
@@ -316,60 +301,50 @@ class Output {
   setChildren(t) {
     this.children = t;
   }
+  addChild(child) {
+    this.children.push(child);
+  }
   getText() {
     return this.text;
   }
 }
 
-function getTriggeredTime(t) {
+async function getTotalTimeOutput(t) {
   let totalOutput = new Output(t);
-  let cat = [];
-  for (let i = 0; i < categoriesArray.length; i++) {
-    if (categoriesArray[i].time != 0) {
-      let title;
-      if (titleIsRef && categoriesArray[i].type === "text") {
-        title = "((" + categoriesArray[i].uid + "))";
-      } else {
-        title = categoriesArray[i].name;
-      }
-      let hideTime = false;
-      //if (displaySubCat && categoriesArray[i].children.length === 1) hideTime = true;
-      let formatedCatTotal = formatDisplayTime(
-        categoriesArray[i],
-        title,
-        categoriesArray[i].format,
-        hideTime
-      );
-      let catOutput = new Output(formatedCatTotal);
-      cat.push(catOutput);
-      let sub = [];
-      if (displaySubCat) {
-        for (let j = 0; j < categoriesArray[i].children.length; j++) {
-          let child = categoriesArray[i].children[j];
-          if (child.time != 0 && child.display) {
-            if (titleIsRef && child.type === "text") {
-              title = "((" + child.uid + "))";
-            } else {
-              title = child.name;
-            }
-            let formatedSubTotal = formatDisplayTime(
-              child,
-              title,
-              child.format
-            );
-            let subOutput = new Output(formatedSubTotal);
-            sub.push(subOutput);
-          }
-        }
-        catOutput.setChildren(sub);
-      }
-    }
-  }
-  totalOutput.setChildren(cat);
+  let parentCategories = categoriesArray.filter((cat) => !cat.parent);
+  parentCategories.forEach(async (parent) => {
+    await setCategoryOutput(parent, totalOutput);
+  });
   return totalOutput;
 }
 
-function insertTotalTime(uid, value, position) {
+async function setCategoryOutput(category, parentOutput) {
+  if (category.time != 0) {
+    let title;
+    if (titleIsRef && category.type === "text") {
+      title = "((" + category.uid + "))";
+    } else {
+      title = category.name;
+    }
+    let hideTime = false;
+    //if (displaySubCat && categoriesArray[i].children.length === 1) hideTime = true;
+    let formatedCatTotal = formatDisplayTime(
+      category,
+      title,
+      category.format,
+      hideTime
+    );
+    let output = new Output(formatedCatTotal);
+    parentOutput.addChild(output);
+    if (displaySubCat && category.children) {
+      category.children.forEach(
+        async (child) => await setCategoryOutput(child, output)
+      );
+    }
+  }
+}
+
+function prepareTotalTimeInsersion(uid, value, position) {
   if (position == -1) {
     window.roamAlphaAPI.updateBlock({
       block: { uid: uid, string: value },
@@ -391,7 +366,7 @@ function insertTotalTime(uid, value, position) {
   }
 }
 
-function insertTriggeredTime(uid, output, isSub = false) {
+function insertTotalTimeByCategory(uid, output, isSub = false) {
   for (let i = 0; i < output.children.length; i++) {
     if (output.children[i] != undefined) {
       let catUid = window.roamAlphaAPI.util.generateUID();
@@ -400,7 +375,7 @@ function insertTriggeredTime(uid, output, isSub = false) {
         block: { uid: catUid, string: output.children[i].getText() },
       });
       if (output.children[i].children.length != 0)
-        insertTriggeredTime(catUid, output.children[i], true);
+        insertTotalTimeByCategory(catUid, output.children[i], true);
     }
   }
   if (uncategorized != 0 && !isSub && output.children.length != 0) {
@@ -680,4 +655,13 @@ function extractElapsedTime(content) {
     return match[1];
   }
   return null;
+}
+
+function hasElapsedTimeInChildren(tree) {
+  if (!tree) return false;
+  else tree = tree.flat(Infinity);
+  let stringified = JSON.stringify(tree);
+  if (extractElapsedTime(stringified)) {
+    return true;
+  } else return false;
 }
