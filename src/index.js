@@ -315,22 +315,29 @@ function setDurationRegex() {
   console.log(durationRegex);
 }
 
-function registerPaletteCommands() {
-  window.roamAlphaAPI.ui.commandPalette.addCommand({
+function registerPaletteCommands(extensionAPI) {
+  extensionAPI.ui.commandPalette.addCommand({
     label: "Elapsed time",
     callback: () => {
       const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
       elapsedTime(startUid);
     },
   });
-  window.roamAlphaAPI.ui.commandPalette.addCommand({
-    label: "Total time today",
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Total time today by categories",
     callback: () => {
       const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
       totalTime(startUid);
     },
   });
-  window.roamAlphaAPI.ui.commandPalette.addCommand({
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Total time of in children or sibbling blocks",
+    callback: () => {
+      const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
+      totalTime(startUid, false);
+    },
+  });
+  extensionAPI.ui.commandPalette.addCommand({
     label: "Total time 7 last days",
     callback: async () => {
       const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
@@ -338,7 +345,7 @@ function registerPaletteCommands() {
       displayTotalByPeriod(startUid, total, "last 7 days");
     },
   });
-  window.roamAlphaAPI.ui.commandPalette.addCommand({
+  extensionAPI.ui.commandPalette.addCommand({
     label: "Total time table",
     callback: async () => {
       let total = await getTotalTimeFromPreviousDays(null, 31);
@@ -634,18 +641,12 @@ export default {
       );
     limitFormat = extensionAPI.settings.get("limitFormatSetting");
 
-    registerPaletteCommands();
+    registerPaletteCommands(extensionAPI);
     registerSmartblocksCommands(extensionAPI);
     getParameters();
     console.log("Elapsed Time Calculator loaded.");
   },
   onunload: () => {
-    window.roamAlphaAPI.ui.commandPalette.removeCommand({
-      label: "Elapsed time",
-    });
-    window.roamAlphaAPI.ui.commandPalette.removeCommand({
-      label: "Total time",
-    });
     console.log("Elapsed Time Calculator unloaded.");
   },
 };

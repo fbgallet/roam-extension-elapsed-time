@@ -27,9 +27,25 @@ export function getParentUID(uid) {
   return window.roamAlphaAPI.q(q)[0][0];
 }
 
+export function getBlockAttributes(uid) {
+  let result = window.roamAlphaAPI.pull("[*]", [":block/uid", uid]);
+  if (result)
+    return {
+      string: result[":block/string"],
+      open: result[":block/open"],
+      heading: result[":block/heading"],
+      align: result[":block/text-align"],
+      view: result[":block/view-type"],
+    };
+  else return null;
+}
+
 export function getBlockContent(uid) {
   return window.roamAlphaAPI.q(`[:find (pull ?page [:block/string])
                       :where [?page :block/uid "${uid}"]  ]`)[0][0].string;
+  // return window.roamAlphaAPI.pull("[:block/string]", [":block/uid", uid])[
+  //   ":block/string"
+  // ];
 }
 
 export function getBlocksUidReferencedInThisBlock(uid) {
@@ -67,10 +83,10 @@ export function getBlocksIncludingRef(uid) {
   );
 }
 
-export function updateBlock(uid, content, isOpen) {
+export function updateBlock(uid, content) {
   setTimeout(function () {
     window.roamAlphaAPI.updateBlock({
-      block: { uid: uid, string: content, open: isOpen },
+      block: { uid: uid, string: content },
     });
   }, 50);
 }

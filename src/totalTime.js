@@ -14,6 +14,7 @@ import {
 import {
   convertMinutesTohhmm,
   extractDelimitedNumberFromString,
+  getBlockContent,
   getBlocksIncludingRef,
   getBlocksUidReferencedInThisBlock,
   getChildrenTree,
@@ -37,7 +38,7 @@ var uncategorized;
 /* TOTAL TIME ON DNP
 /*======================================================================================================*/
 
-export async function totalTime(currentUID) {
+export async function totalTime(currentUID, byCategories = true) {
   let total = 0;
   resetTotalTimes();
   let parentUID;
@@ -49,9 +50,10 @@ export async function totalTime(currentUID) {
     parentUID = getParentUID(currentUID);
     blockTree = getChildrenTree(parentUID);
   }
-  total = await directChildrenProcess(blockTree);
-  let displayTotal = await formatDisplayTime({ time: total }, "", "");
-  let totalOutput = await getTotalTimeOutput(displayTotal);
+  byCategories
+    ? (total = await directChildrenProcess(blockTree))
+    : (total = getTotalTimeInTree(blockTree));
+  let totalOutput = getTotalTimeOutput(total);
   let totalUid = prepareTotalTimeInsersion(
     currentUID,
     totalOutput.text,
@@ -85,7 +87,7 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
       let pomo = extractPomodoro(blockContent);
       if (pomo) {
         totalPomo.nb++;
-        totalPomo.time += parseInt(pomo[1]);
+        totalPomo.time += parseInt(pomo);
       }
       if (!time) time = pomo ? pomo[1] : null;
       //console.log(categoriesRegex);
@@ -197,7 +199,9 @@ function addOnlySupCatIfSynonym(cat, lastCatName, catArray) {
 }
 
 function extractPomodoro(content) {
-  return content.match(pomodoroRegex);
+  let result = content.match(pomodoroRegex);
+  if (result) result = result[1];
+  return result;
 }
 
 function getTriggerIndexes(
@@ -309,16 +313,24 @@ class Output {
   }
 }
 
-async function getTotalTimeOutput(t) {
-  let totalOutput = new Output(t);
+function getTotalTimeOutput(total) {
+  let totalToBeCalculated = false;
+  let displayTotal;
+  if (total != 0) displayTotal = formatDisplayTime({ time: total }, "", "");
+  else totalToBeCalculated = true;
+  let totalOutput = new Output(displayTotal);
   let parentCategories = categoriesArray.filter((cat) => !cat.parent);
-  parentCategories.forEach(async (parent) => {
-    await setCategoryOutput(parent, totalOutput);
+  parentCategories.forEach((parent) => {
+    setCategoryOutput(parent, totalOutput);
+    total += parent.time;
   });
+  if (totalToBeCalculated)
+    displayTotal = formatDisplayTime({ time: total }, "", "");
+  totalOutput.text = displayTotal;
   return totalOutput;
 }
 
-async function setCategoryOutput(category, parentOutput) {
+function setCategoryOutput(category, parentOutput) {
   if (category.time != 0) {
     let title;
     if (titleIsRef && category.type === "text") {
@@ -337,9 +349,7 @@ async function setCategoryOutput(category, parentOutput) {
     let output = new Output(formatedCatTotal);
     parentOutput.addChild(output);
     if (displaySubCat && category.children) {
-      category.children.forEach(
-        async (child) => await setCategoryOutput(child, output)
-      );
+      category.children.forEach((child) => setCategoryOutput(child, output));
     }
   }
 }
@@ -528,6 +538,21 @@ export function getTotaTimeInDailyLog(dayLog) {
   if (dayLog.target && !stringified.includes(dayLog.target)) return 0;
   if (extractElapsedTime(stringified)) {
     let total = getTimesFromArray(stringified.split('"string":"'), dayLog);
+    return total;
+  } else return 0;
+}
+
+function getTotalTimeInTree(tree) {
+  let stringified = JSON.stringify(tree); //.split('"string":"');
+  if (extractElapsedTime(stringified)) {
+    let total = 0;
+    stringified.split('"string":"').forEach((string) => {
+      let result = extractElapsedTime(string);
+      if (!result) {
+        result = extractPomodoro(string);
+      }
+      total += !result ? 0 : parseInt(result);
+    });
     return total;
   } else return 0;
 }

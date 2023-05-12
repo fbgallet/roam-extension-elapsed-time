@@ -3,6 +3,7 @@ import "../node_modules/izitoast/dist/css/iziToast.css";
 import {
   addZero,
   extractDelimitedNumberFromString,
+  getBlockAttributes,
   getBlockContent,
   getBlocksUidReferencedInThisBlock,
   getNormalizedTimestamp,
@@ -54,10 +55,8 @@ class TimeStamp {
 export async function elapsedTime(blockUID) {
   let hourTag = "";
   let blockContent = getBlockContent(blockUID);
-  // let blockSplit = blockContent.split(":");
-  // let leftShift = getLeftShift(blockSplit[0]);
+  blockContent = blockContent.replace(" {{⇥🕞:SmartBlock:Elapsed time}}", "");
   let matchingTT = [...blockContent.matchAll(timestampRegex)];
-  //let begin = new TimeStamp(blockContent.slice(leftShift, leftShift + 5));
   if (!matchingTT) return;
   let begin = new TimeStamp(matchingTT[0][0]);
   let end;
@@ -192,11 +191,7 @@ function compareToLimitsAndUpdate(
             [
               "<button>Great!</button>",
               async (instance, toast) => {
-                updateBlock(
-                  blockUID,
-                  leftPart + goodFormat + " " + rightPart,
-                  true
-                );
+                updateBlock(blockUID, leftPart + goodFormat + " " + rightPart);
                 instance.hide({ transitionOut: "fadeOut" }, toast, "button");
               },
               true,
@@ -204,11 +199,7 @@ function compareToLimitsAndUpdate(
             [
               buttonCaption,
               async (instance, toast) => {
-                updateBlock(
-                  blockUID,
-                  leftPart + badFormat + " " + rightPart,
-                  true
-                );
+                updateBlock(blockUID, leftPart + badFormat + " " + rightPart);
                 instance.hide({ transitionOut: "fadeOut" }, toast, "button");
               },
             ],
@@ -259,22 +250,14 @@ function compareToLimitsAndUpdate(
             [
               "<button>Good anyway!</button>",
               async (instance, toast) => {
-                updateBlock(
-                  blockUID,
-                  leftPart + goodFormat + " " + rightPart,
-                  true
-                );
+                updateBlock(blockUID, leftPart + goodFormat + " " + rightPart);
                 instance.hide({ transitionOut: "fadeOut" }, toast, "button");
               },
             ],
             [
               buttonCaption,
               async (instance, toast) => {
-                updateBlock(
-                  blockUID,
-                  leftPart + badFormat + " " + rightPart,
-                  true
-                );
+                updateBlock(blockUID, leftPart + badFormat + " " + rightPart);
                 instance.hide({ transitionOut: "fadeOut" }, toast, "button");
               },
               true,
@@ -285,7 +268,7 @@ function compareToLimitsAndUpdate(
     }
   }
   rightPart = removePreviousDuration(rightPart);
-  updateBlock(blockUID, leftPart + rightPart, true);
+  updateBlock(blockUID, leftPart + rightPart);
 }
 
 function removePreviousDuration(content) {
