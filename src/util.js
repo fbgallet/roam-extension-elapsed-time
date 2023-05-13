@@ -67,6 +67,15 @@ export async function getMainPageUid() {
   return pageUid[":block/page"][":block/uid"];
 }
 
+export function getPageUidByAnyBlockUid(blockUid) {
+  let pageUid = window.roamAlphaAPI.pull("[{:block/page [:block/uid]}]", [
+    ":block/uid",
+    blockUid,
+  ]);
+  if (pageUid === null) return blockUid;
+  return pageUid[":block/page"][":block/uid"];
+}
+
 export function getPageUidByTitle(title) {
   let result = window.roamAlphaAPI.pull("[:block/uid]", [":node/title", title]);
   if (result) return result[":block/uid"];

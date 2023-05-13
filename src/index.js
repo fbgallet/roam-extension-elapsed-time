@@ -10,6 +10,7 @@ import {
 import {
   escapeCharacters,
   getChildrenTree,
+  getPageUidByAnyBlockUid,
   getRegexFromArray,
   getStringsAroundPlaceHolder,
   normalizeUID,
@@ -324,17 +325,17 @@ function registerPaletteCommands(extensionAPI) {
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Total time today by categories",
+    label: "Total time in current page, by categories",
     callback: () => {
       const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
-      totalTime(startUid);
+      totalTime(startUid, getPageUidByAnyBlockUid(startUid));
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Total time of in children or sibbling blocks",
+    label: "Total time only, in children or sibbling blocks",
     callback: () => {
       const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
-      totalTime(startUid, false);
+      totalTime(startUid, startUid, false);
     },
   });
   extensionAPI.ui.commandPalette.addCommand({

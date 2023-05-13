@@ -38,7 +38,7 @@ var uncategorized;
 /* TOTAL TIME ON DNP
 /*======================================================================================================*/
 
-export async function totalTime(currentUID, byCategories = true) {
+export async function totalTime(currentUID, scopeUid, byCategories = true) {
   let total = 0;
   resetTotalTimes();
   let parentUID;
@@ -50,9 +50,10 @@ export async function totalTime(currentUID, byCategories = true) {
     parentUID = getParentUID(currentUID);
     blockTree = getChildrenTree(parentUID);
   }
-  byCategories
-    ? (total = await directChildrenProcess(blockTree))
-    : (total = getTotalTimeInTree(blockTree));
+  if (byCategories) {
+    blockTree = getChildrenTree(scopeUid);
+    total = await directChildrenProcess(blockTree);
+  } else total = getTotalTimeInTree(blockTree);
   let totalOutput = getTotalTimeOutput(total);
   let totalUid = prepareTotalTimeInsersion(
     currentUID,
