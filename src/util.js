@@ -1,5 +1,14 @@
 import { durationRegex } from ".";
 
+const numberRegex =
+  /\d+|one|two|three|for|five|six|seven|height|nine|ten|eleven|twelve|thirteen|fourteen|fithteen|twenty|thirty|forty|fithty|sixty|hundred/;
+const periodRegex =
+  /day|week|month|quarter|year|jour|semaine|mois|trimestre|année/;
+const pastAdjectiveRegex =
+  /last|previous|former|past|prior|yesterday|dernier|dernière|précédent|passé|hier/;
+const presentAdjectiveRegex =
+  /this|current|present|that|actual|ce |cette |en cours/;
+
 export function getTreeByPageTitle(pageTitle) {
   return window.roamAlphaAPI.q(`[:find ?uid ?s 
 							   :where [?b :node/title "${pageTitle}"]
@@ -82,6 +91,13 @@ export function getPageUidByTitle(title) {
   else return null;
 }
 
+export function getPageUidByPageName(page) {
+  let p = window.roamAlphaAPI.q(`[:find (pull ?e [:block/uid]) 
+							     :where [?e :node/title "${page}"]]`);
+  if (p.length == 0) return undefined;
+  else return p[0][0].uid;
+}
+
 export function getBlocksIncludingRef(uid) {
   return window.roamAlphaAPI.q(
     `[:find ?u ?s
@@ -100,8 +116,96 @@ export function updateBlock(uid, content) {
   }, 50);
 }
 
-export function getNormalizedTimestamp(h, m) {
-  return addZero(h) + ":" + addZero(m);
+export async function createBlock(
+  parent,
+  content,
+  fixedUid = false,
+  open = true,
+  order = "last"
+) {
+  let uid;
+  if (fixedUid) {
+    uid = await window.roamAlphaAPI.util.generateUID();
+    await window.roamAlphaAPI.createBlock({
+      location: { "parent-uid": parent, order: order },
+      block: { uid: uid, string: content, open: open },
+    });
+    return uid;
+  } else {
+    await window.roamAlphaAPI.createBlock({
+      location: { "parent-uid": parent, order: order },
+      block: { string: content, open: open },
+    });
+  }
+}
+
+export function simpleCreateBlock(
+  parent,
+  uid,
+  content,
+  open = true,
+  order = "last"
+) {
+  if (uid)
+    window.roamAlphaAPI.createBlock({
+      location: { "parent-uid": parent, order: order },
+      block: { uid: uid, string: content, open: open },
+    });
+  else
+    window.roamAlphaAPI.createBlock({
+      location: { "parent-uid": parent, order: order },
+      block: { string: content, open: open },
+    });
+}
+
+export async function addChildrenBlocks(
+  parentUid,
+  array,
+  returnUids = false,
+  open = true
+) {
+  let blocksUid = [];
+  for (let i = 0; i < array.length; i++) {
+    let uid = await createBlock(parentUid, array[i], returnUids, open);
+    blocksUid.push(uid);
+    if (i == array.length - 1 && returnUids) return blocksUid;
+  }
+}
+
+export async function getCurrentBlockUidOrCreateIt() {
+  let uid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
+  if (!uid) {
+    let pageUid = await getMainPageUid();
+    let pageTree = getChildrenTree(pageUid);
+    uid = window.roamAlphaAPI.util.generateUID();
+    window.roamAlphaAPI.createBlock({
+      location: { "parent-uid": pageUid, order: pageTree.length },
+      block: { uid: uid, string: "" },
+    });
+  }
+  return uid;
+}
+
+export function addPullWatch(uid, callback) {
+  console.log("Pullwatch on " + uid);
+  window.roamAlphaAPI.data.addPullWatch(
+    "[:block/children :block/string {:block/children ...}]",
+    `[:block/uid "${uid}"]`,
+    function a(before, after) {
+      console.log("after", after);
+      callback(uid);
+    }
+  );
+}
+export function removePullWatch(uid, callback) {
+  console.log("Removed pullwatch");
+  window.roamAlphaAPI.data.removePullWatch(
+    "[:block/children :block/string {:block/children ...}]",
+    `[:block/uid "${uid}"]`,
+    function a(before, after) {
+      callback(uid);
+    }
+  );
 }
 
 export function normalizeUID(uid) {
@@ -111,6 +215,22 @@ export function normalizeUID(uid) {
   console.log("Invalid block reference (uid).");
   return undefined;
 }
+
+export function simulateClick(el) {
+  const options = {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+    target: el,
+    which: 1,
+    button: 0,
+  };
+  el.dispatchEvent(new MouseEvent("mousedown", options));
+  el.dispatchEvent(new MouseEvent("mouseup", options));
+  el.dispatchEvent(new MouseEvent("click", options));
+}
+
+// DATE & TIME FUNCTIONS
 
 export function convertMinutesTohhmm(time) {
   let h = Math.floor(time / 60);
@@ -150,10 +270,173 @@ export function addZero(i) {
   return nb;
 }
 
+export function getNormalizedTimestamp(h, m) {
+  return addZero(h) + ":" + addZero(m);
+}
+
+export function getWeekNumber(date) {
+  const oneJan = new Date(date.getFullYear(), 0, 1);
+  const day = (date.getDay() + 6) % 7;
+  const daysSinceOneJan = (date - oneJan) / 86400000 + 1;
+  const week = Math.floor((daysSinceOneJan - day + 10) / 7);
+  return week;
+}
+
+export function getQuarter(date) {
+  return Math.floor(date.getMonth() / 3) + 1;
+}
+
+export function dateIsInPeriod(day, period, dateFlag) {
+  let r = false;
+  switch (period) {
+    case "week":
+      getWeekNumber(day) == dateFlag ? (r = true) : (r = false);
+      break;
+    case "month":
+      day.getMonth() == dateFlag ? (r = true) : (r = false);
+      break;
+    case "quarter":
+      getQuarter(day) == dateFlag ? (r = true) : (r = false);
+      break;
+    case "year":
+      day.getFullYear() == dateFlag ? (r = true) : (r = false);
+      break;
+  }
+  return r;
+}
+
+export async function getNbOfDaysFromBlock(uid) {
+  let content = getBlockContent(uid);
+  let result, periodValue;
+  if (!content) return null;
+  let number = content.match(numberRegex);
+  if (number) {
+    number = number[0].trim();
+    if (isNaN(number)) number = convertAlphabeticNumberToValue(number);
+    else number = parseInt(number);
+  }
+  if (!number) number = 1;
+  let period = content.match(periodRegex);
+  if (period) {
+    periodValue = convertPeriodInNumberOfDays(period[0]);
+  } else periodValue = 1;
+  let present = content.match(presentAdjectiveRegex);
+  if (present) {
+    result = periodValue;
+  } else result = number * periodValue;
+  let last = content.match(pastAdjectiveRegex);
+  if (last && period) {
+    result = "last " + period[0];
+  }
+  console.log(result);
+  return result;
+}
+
+function getLastDayOfPreviousWeek(day) {
+  //let lastWeek = new Date(day.getTime() - 7 * 24 * 60 * 60 * 1000);
+  let dayToSustract = day.getDay();
+  if (dayToSustract == 0) dayToSustract = 7;
+  console.log(dayToSustract);
+  return new Date(day.getTime() - dayToSustract * 24 * 60 * 60 * 1000);
+}
+
+function getLastDayOfPreviousMonth(day) {
+  let lastMonth = new Date(day.getFullYear(), day.getMonth() - 1, 1);
+  return new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0);
+}
+
+function getLastDayOfPreviousQuarter(day) {
+  let quarterStartMonth = Math.floor(day.getMonth() / 3) * 3;
+  let lastQuarter = new Date(day.getFullYear(), quarterStartMonth - 3, 1);
+  return new Date(lastQuarter.getFullYear(), lastQuarter.getMonth() + 3, 0);
+}
+
+function getLastDayOfPreviousYear(day) {
+  return new Date(day.getFullYear() - 1, 12, 31);
+}
+
+export function getLastDayOfPreviousPeriod(today, period) {
+  switch (period) {
+    case "week":
+      return getLastDayOfPreviousWeek(today);
+    case "month":
+      return getLastDayOfPreviousMonth(today);
+    case "quarter":
+      return getLastDayOfPreviousQuarter(today);
+    case "year":
+      return getLastDayOfPreviousYear(today);
+    default:
+      return getYesterdayDate(today);
+  }
+}
+
+export function convertPeriodInNumberOfDays(period) {
+  switch (period) {
+    case "week":
+      return 7;
+    case "month":
+      return 31;
+    case "quarter":
+      return 92;
+    case "year":
+      return 366;
+    default:
+      return 1;
+  }
+}
+
+function convertAlphabeticNumberToValue(number) {
+  switch (number) {
+    case "one":
+      return 1;
+    case "two":
+      return 2;
+    case "three":
+      return 3;
+    case "four":
+      return 4;
+    case "five":
+      return 5;
+    case "six":
+      return 6;
+    case "seven":
+      return 7;
+    case "eight":
+      return 8;
+    case "nine":
+      return 9;
+    case "ten":
+      return 10;
+    case "eleven":
+      return 11;
+    case "twelve":
+      return 12;
+    case "thirteen":
+      return 13;
+    case "fourteen":
+      return 14;
+    case "fifteen":
+      return 15;
+    case "twenty":
+      return 20;
+    case "thirty":
+      return 30;
+    case "forty":
+      return 40;
+    case "fithty":
+      return 50;
+    case "sixty":
+      return 60;
+    case "hundred":
+      return 100;
+    default:
+      return null;
+  }
+}
+
 export function extractDelimitedNumberFromString(blockContent, before, after) {
   let number;
   let match = blockContent.match(durationRegex);
-  console.log(match);
   if (match) {
     return match[1];
   }
@@ -199,4 +482,12 @@ export function getRegexFromArray(arr) {
 
 export function escapeCharacters(str) {
   return str.replaceAll(/[.*+?^${}()|\[\]\\]/g, "\\$&");
+}
+
+export function sumOfArrayElements(array) {
+  let s = 0;
+  for (let i = 0; i < array.length; i++) {
+    s += array[i];
+  }
+  return s;
 }

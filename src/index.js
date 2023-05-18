@@ -1,4 +1,9 @@
 import { displayTotalTimesTable } from "./components";
+import {
+  createCategoriesBlock,
+  createLimitsBlock,
+  createSettingsPage,
+} from "./data";
 import { elapsedTime } from "./elapsedTime";
 import {
   displayTotalByPeriod,
@@ -6,14 +11,20 @@ import {
   getTotalTimeForCurrentPage,
   getTotalTimeFromPreviousDays,
   totalTime,
+  totalTimeForGivenPeriod,
 } from "./totalTime";
 import {
+  addPullWatch,
   escapeCharacters,
+  getBlockAttributes,
   getChildrenTree,
+  getCurrentBlockUidOrCreateIt,
+  getNbOfDaysFromBlock,
   getPageUidByAnyBlockUid,
   getRegexFromArray,
   getStringsAroundPlaceHolder,
   normalizeUID,
+  removePullWatch,
 } from "./util";
 
 /************************* PANEL SETTINGS VAR **************************/
@@ -28,7 +39,9 @@ export var confirmPopup,
   durationRegex,
   splittedDurationFormat,
   totalFormat,
-  limitFormat;
+  limitFormat,
+  autoCopyTotalToClipboard,
+  displayTotalAsTable;
 export const limitFlagDefault = {
   task: {
     goal: { success: "🎯", failure: "⚠️" },
@@ -164,7 +177,8 @@ export function scanCategories(s, refs, callBack, once) {
 }
 
 function getCategories(parentUid) {
-  categoriesArray = [];
+  categoriesArray.length = 0;
+  categoriesNames.length = 0;
   let triggerTree = getChildrenTree(parentUid);
 
   if (triggerTree) {
@@ -325,32 +339,99 @@ function registerPaletteCommands(extensionAPI) {
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Total time in current page, by categories",
+    label: "Elapsed time: Total in current page, by categories",
     callback: () => {
       const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
       totalTime(startUid, getPageUidByAnyBlockUid(startUid));
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Total time only, in children or sibbling blocks",
+    label: "Elapsed time: Total without detail in children or sibbling blocks",
     callback: () => {
       const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
       totalTime(startUid, startUid, false);
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Total time 7 last days",
+    label: "Elapsed time: Total for current week",
     callback: async () => {
-      const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
-      let total = await getTotalTimeFromPreviousDays(null, 7);
-      displayTotalByPeriod(startUid, total, "last 7 days");
+      totalTimeForGivenPeriod("week");
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Total time table",
+    label: "Elapsed time: Total for current month",
     callback: async () => {
-      let total = await getTotalTimeFromPreviousDays(null, 31);
-      displayTotalTimesTable();
+      totalTimeForGivenPeriod("month");
+    },
+  });
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Elapsed time: Total for current quarter",
+    callback: async () => {
+      totalTimeForGivenPeriod("quarter");
+    },
+  });
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Elapsed time: Total for current year",
+    callback: async () => {
+      totalTimeForGivenPeriod("year");
+    },
+  });
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Elapsed time: Total according to the expression in current block",
+    callback: () => {
+      const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
+      if (!startUid) return;
+      totalTimeForGivenPeriod(null, startUid);
+    },
+  });
+
+  // TODO
+  //
+  // extensionAPI.ui.commandPalette.addCommand({
+  //   label: "Elapsed time: Total time in table",
+  //   callback: async () => {
+  //     let total = await getTotalTimeFromPreviousDays(null, 31);
+  //     displayTotalTimesTable();
+  //   },
+  // });
+
+  if (getBlockAttributes(categoriesUID)) {
+    addOpenCategoriesCommand(extensionAPI);
+  } else {
+    extensionAPI.ui.commandPalette.addCommand({
+      label: "Elapsed time: Set categories list, goals & limits",
+      callback: async () => {
+        let pageUid = await createSettingsPage(extensionAPI);
+        await createCategoriesBlock(pageUid, extensionAPI);
+        await createLimitsBlock(pageUid, extensionAPI);
+        addOpenCategoriesCommand(extensionAPI);
+        addOpenLimitsCommand(extensionAPI);
+      },
+    });
+  }
+  if (limitsUID) {
+    addOpenLimitsCommand(extensionAPI);
+  }
+}
+
+function addOpenCategoriesCommand(extensionAPI) {
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Elapsed time: Open categories list in sidebar",
+    callback: async () => {
+      window.roamAlphaAPI.ui.rightSidebar.addWindow({
+        window: { type: "block", "block-uid": categoriesUID },
+      });
+    },
+  });
+}
+
+function addOpenLimitsCommand(extensionAPI) {
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Elapsed time: Open goals & limits in sidebar",
+    callback: async () => {
+      window.roamAlphaAPI.ui.rightSidebar.addWindow({
+        window: { type: "block", "block-uid": limitsUID },
+      });
     },
   });
 }
@@ -367,11 +448,25 @@ function registerSmartblocksCommands(extensionAPI) {
   };
   const totalCmd = {
     text: "TOTALTIME",
-    help: "Calcul total elapsed time and total by category in sibbling blocks or first level of children blocks",
-    handler: (context) => () => {
-      totalTime(context.targetUid);
-      return "";
-    },
+    help:
+      "Calcul total elapsed time in current page (by default)." +
+      "\n- First argument (optional): period (week, month, quarter or year)." +
+      "\n- Second argument (optional): if true, return only total, without categories.",
+    handler:
+      (context) =>
+      async (period = null, byCategories = true) => {
+        console.log(context.variables);
+        console.log(period);
+        //period = context.variables.period;
+        if (!period)
+          totalTime(
+            context.targetUid,
+            await getPageUidByAnyBlockUid(context.targetUid),
+            byCategories === false ? false : true
+          );
+        else totalTimeForGivenPeriod(period, context.targetUid);
+        return "";
+      },
   };
   const updCatCmd = {
     text: "UPDATECATSFORET",
@@ -393,6 +488,7 @@ function registerSmartblocksCommands(extensionAPI) {
       return "";
     },
   };
+
   if (window.roamjs?.extension?.smartblocks) {
     window.roamjs.extension.smartblocks.registerCommand(elapCmd);
     window.roamjs.extension.smartblocks.registerCommand(totalCmd);
@@ -485,6 +581,19 @@ const panelConfig = {
           else {
             limitFlag = limitFlagDefault;
           }
+        },
+      },
+    },
+    {
+      id: "displayTotalSetting",
+      name: "Inline display as blocks",
+      description: "Display inline total as blocks or Roam {{table}}",
+      action: {
+        type: "select",
+        items: ["blocks", "table"],
+        onChange: (sel) => {
+          if ((sel = "blocks")) displayTotalAsTable = false;
+          else displayTotalAsTable = true;
         },
       },
     },
@@ -595,6 +704,18 @@ const panelConfig = {
         },
       },
     },
+    {
+      id: "autoCopyToClipboard",
+      name: "Copy total to clipboard",
+      description:
+        "Automatically copy simple total time table to clipboard when displaying total:",
+      action: {
+        type: "switch",
+        onChange: (evt) => {
+          autoCopyTotalToClipboard = !autoCopyTotalToClipboard;
+        },
+      },
+    },
   ],
 };
 
@@ -602,7 +723,20 @@ export default {
   onload: ({ extensionAPI }) => {
     extensionAPI.settings.panel.create(panelConfig);
     categoriesUID = extensionAPI.settings.get("categoriesSetting");
+    if (categoriesUID)
+      getBlockAttributes(categoriesUID)
+        ? addPullWatch(categoriesUID, getCategories)
+        : extensionAPI.settings.set("categoriesSetting", undefined);
     limitsUID = extensionAPI.settings.get("limitsSetting");
+    if (limitsUID)
+      getBlockAttributes(limitsUID)
+        ? addPullWatch(limitsUID, getLimits)
+        : extensionAPI.settings.set("limitsSetting", undefined);
+    if (extensionAPI.settings.get("displayTotalSetting") == null)
+      extensionAPI.settings.set("button-setting", "blocks");
+    extensionAPI.settings.get("displayTotalSetting") === "blocks"
+      ? (displayTotalAsTable = false)
+      : (displayTotalAsTable = true);
     if (extensionAPI.settings.get("displaySetting") == null)
       extensionAPI.settings.set("button-setting", true);
     displaySubCat = extensionAPI.settings.get("displaySetting");
@@ -641,6 +775,9 @@ export default {
         "<flag> (<type>: <value>')"
       );
     limitFormat = extensionAPI.settings.get("limitFormatSetting");
+    if (extensionAPI.settings.get("autoCopyToClipboard") == null)
+      extensionAPI.settings.set("autoCopyToClipboard", true);
+    autoCopyTotalToClipboard = extensionAPI.settings.get("autoCopyToClipboard");
 
     registerPaletteCommands(extensionAPI);
     registerSmartblocksCommands(extensionAPI);
@@ -649,5 +786,7 @@ export default {
   },
   onunload: () => {
     console.log("Elapsed Time Calculator unloaded.");
+    if (categoriesUID) removePullWatch(categoriesUID, getCategories);
+    if (limitsUID) removePullWatch(limitsUID, getLimits);
   },
 };

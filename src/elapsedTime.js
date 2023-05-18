@@ -3,10 +3,8 @@ import "../node_modules/izitoast/dist/css/iziToast.css";
 import {
   addZero,
   extractDelimitedNumberFromString,
-  getBlockAttributes,
   getBlockContent,
   getBlocksUidReferencedInThisBlock,
-  getNormalizedTimestamp,
   updateBlock,
 } from "./util";
 import {
@@ -295,4 +293,16 @@ function extractLimit(s, shift) {
     i++;
   }
   return t;
+}
+
+export function simpleIziMessage(message) {
+  iziToast.info({
+    timeout: 5000,
+    displayMode: "replace",
+    id: "timing",
+    zindex: 999,
+    // title: textTitle,
+    message: message,
+    position: "bottomCenter",
+  });
 }

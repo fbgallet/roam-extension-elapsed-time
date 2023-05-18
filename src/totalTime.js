@@ -4,26 +4,36 @@ import {
   durationRegex,
   limitFlag,
   limitFormat,
-  scanCategories,
   splittedDurationFormat,
   totalFormat,
   totalTitle,
   categoriesRegex,
   categoriesArray,
+  autoCopyTotalToClipboard,
+  displayTotalAsTable,
 } from ".";
+import { simpleIziMessage } from "./elapsedTime";
 import {
   convertMinutesTohhmm,
-  extractDelimitedNumberFromString,
+  convertPeriodInNumberOfDays,
+  createBlock,
+  dateIsInPeriod,
   getBlockContent,
   getBlocksIncludingRef,
-  getBlocksUidReferencedInThisBlock,
   getChildrenTree,
-  getMainPageUid,
+  getCurrentBlockUidOrCreateIt,
+  getLastDayOfPreviousPeriod,
+  getNbOfDaysFromBlock,
+  getPageUidByAnyBlockUid,
   getPageUidByTitle,
   getParentUID,
-  getRegexFromArray,
+  getQuarter,
   getWeek,
+  getWeekNumber,
   getYesterdayDate,
+  simpleCreateBlock,
+  simulateClick,
+  sumOfArrayElements,
 } from "./util";
 
 const pomodoroRegex = /\{\{\[?\[?POMO\]?\]?: ?([0-9]*)\}\}/;
@@ -33,10 +43,11 @@ const totalPomo = {
 };
 var titleIsRef = true; // Trigger words are inserted as block references in Total display
 var uncategorized;
+let outputForClipboard;
 
-/*======================================================================================================*/
-/* TOTAL TIME ON DNP
-/*======================================================================================================*/
+/*========================================================================*/
+/* TOTAL TIME ON CURRENT PAGE
+/*========================================================================*/
 
 export async function totalTime(currentUID, scopeUid, byCategories = true) {
   let total = 0;
@@ -60,11 +71,20 @@ export async function totalTime(currentUID, scopeUid, byCategories = true) {
     totalOutput.text,
     position
   );
-  insertTotalTimeByCategory(totalUid, totalOutput);
+  displayTotalAsTable
+    ? insertTableOfTotalByCategory(totalOutput, totalUid, "", 0)
+    : insertTotalTimeByCategory(totalUid, totalOutput);
+  if (totalOutput.time != 0 && totalOutput.children.length != 0)
+    copyTotalToClipboard();
 }
 
 function resetTotalTimes() {
   uncategorized = 0;
+  outputForClipboard = "";
+  totalPomo = {
+    nb: 0,
+    time: 0,
+  };
   for (let i = 0; i < categoriesArray.length; i++) {
     categoriesArray[i].time = 0;
     if (categoriesArray[i].children) {
@@ -83,7 +103,7 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
     for (let i = 0; i < length; i++) {
       let processChildren = true;
       let blockContent = tree[i].string;
-      console.log(blockContent);
+      //console.log(blockContent);
       let time = extractElapsedTime(blockContent);
       let pomo = extractPomodoro(blockContent);
       if (pomo) {
@@ -94,7 +114,6 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
       //console.log(categoriesRegex);
       //let matchingWords = [...blockContent.matchAll(categoriesRegex)];
       let matchingWords = blockContent.match(categoriesRegex);
-      // TODO getSubCats from parentBlockCat
       let triggeredCat;
       if (matchingWords) {
         // console.log("matchingWords");
@@ -117,8 +136,8 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
         processChildren = false;
       }
       if (processChildren && tree[i].children) {
-        console.log("parentBlockCat");
-        console.log(parentBlockCat);
+        // console.log("parentBlockCat");
+        // console.log(parentBlockCat);
         directChildrenProcess(tree[i].children, parentBlockCat);
       }
     }
@@ -143,17 +162,11 @@ function getTriggeredCategoriesFromNames(names, parentBlockCat) {
         let possibleCategories = categoriesArray.filter(
           (cat) => cat.name === name
         );
-        //let test = null;
         if (possibleCategories) return possibleCategories;
-        //   test = possibleCategories.map((cat) => {
-        //     if (names.includes(cat.parent?.name)) return [cat.parent, cat];
-        //   });
-        // if (test) return test;
       })
     );
     //console.log(catAndPossiblesCat);
     if (catAndPossiblesCat) {
-      // catAndPossiblesCat.forEach
       result = result.concat(getTriggeredCategories(catAndPossiblesCat));
       // console.log("Block result:");
       // console.log(result);
@@ -205,207 +218,31 @@ function extractPomodoro(content) {
   return result;
 }
 
-function getTriggerIndexes(
-  tw,
-  i,
-  j,
-  indexTab,
-  hasCat = false,
-  tag = "",
-  word = " "
-) {
-  if (tw === null) return [[-1, -1]];
-  if (j === -1) {
-    indexTab.push([i, j]);
-    return indexTab;
-  }
-  if (tag != word) {
-    indexTab.push([i, j]);
-    if (hasCat) {
-      let tagIndex = [];
-      let tabWithoutCat = JSON.stringify(indexTab).replace(
-        JSON.stringify([i, -1]),
-        ""
-      );
-      if (tabWithoutCat.includes(",-1]")) {
-        let left = tabWithoutCat.split(",-1]")[0].split("[");
-        tagIndex = [left[left.length - 1], -1];
+function getTotalTimeInTree(tree) {
+  let stringified = JSON.stringify(tree); //.split('"string":"');
+  if (extractElapsedTime(stringified)) {
+    let total = 0;
+    stringified.split('"string":"').forEach((string) => {
+      let result = extractElapsedTime(string);
+      if (!result) {
+        result = extractPomodoro(string);
       }
-      indexTab.splice(0, indexTab.length - 2);
-      if (tagIndex.length > 0) {
-        indexTab.push(tagIndex);
-      }
-    }
-  }
-  return indexTab;
-}
-
-function formatDisplayTime(w, title, formatTag, hide = false) {
-  let t;
-  let l = "";
-  if (w != null) {
-    t = w.time;
-    l = displayLimit(w);
-  } else t = uncategorized;
-  if (title == "") {
-    return totalTitle
-      .replace("<tm>", t.toString())
-      .replace("<th>", convertMinutesTohhmm(t));
-  }
-  if (hide) return title;
-  return (
-    totalFormat
-      .replace("<category>", title)
-      .replace("<tm>", t.toString())
-      .replace("<th>", convertMinutesTohhmm(t))
-      .replace("<limit>", l)
-      .trim() +
-    " " +
-    formatTag
-  );
-}
-
-function displayLimit(w) {
-  let flag = "";
-  let comp = "";
-  if (w.limit != null) {
-    if (w.limit.type != "undefined" && w.limit.day != 0) {
-      if (w.limit.type == "goal") {
-        if (w.time >= w.limit.day) {
-          flag = limitFlag.day.goal.success;
-          comp = ">=";
-        } else {
-          flag = limitFlag.day.goal.failure;
-          comp = "<";
-        }
-      } else if (w.limit.type == "limit") {
-        if (w.time <= w.limit.day) {
-          flag = limitFlag.day.limit.success;
-          comp = "<=";
-        } else {
-          flag = limitFlag.day.limit.failure;
-          comp = ">";
-        }
-      }
-      let r = limitFormat.replace("<type>", w.limit.type);
-      r = r.replace("<value>", w.limit.day.toString());
-      r = r.replace("<comp>", comp);
-      r = r.replace("<flag>", flag);
-      return r;
-    }
-  }
-  return "";
-}
-
-class Output {
-  constructor(s) {
-    this.text = s;
-    this.children = [];
-  }
-
-  setChildren(t) {
-    this.children = t;
-  }
-  addChild(child) {
-    this.children.push(child);
-  }
-  getText() {
-    return this.text;
-  }
-}
-
-function getTotalTimeOutput(total) {
-  let totalToBeCalculated = false;
-  let displayTotal;
-  if (total != 0) displayTotal = formatDisplayTime({ time: total }, "", "");
-  else totalToBeCalculated = true;
-  let totalOutput = new Output(displayTotal);
-  let parentCategories = categoriesArray.filter((cat) => !cat.parent);
-  parentCategories.forEach((parent) => {
-    setCategoryOutput(parent, totalOutput);
-    total += parent.time;
-  });
-  if (totalToBeCalculated)
-    displayTotal = formatDisplayTime({ time: total }, "", "");
-  totalOutput.text = displayTotal;
-  return totalOutput;
-}
-
-function setCategoryOutput(category, parentOutput) {
-  if (category.time != 0) {
-    let title;
-    if (titleIsRef && category.type === "text") {
-      title = "((" + category.uid + "))";
-    } else {
-      title = category.name;
-    }
-    let hideTime = false;
-    //if (displaySubCat && categoriesArray[i].children.length === 1) hideTime = true;
-    let formatedCatTotal = formatDisplayTime(
-      category,
-      title,
-      category.format,
-      hideTime
-    );
-    let output = new Output(formatedCatTotal);
-    parentOutput.addChild(output);
-    if (displaySubCat && category.children) {
-      category.children.forEach((child) => setCategoryOutput(child, output));
-    }
-  }
-}
-
-function prepareTotalTimeInsersion(uid, value, position) {
-  if (position == -1) {
-    window.roamAlphaAPI.updateBlock({
-      block: { uid: uid, string: value },
+      total += !result ? 0 : parseInt(result);
     });
-    return uid;
-  } else {
-    let totalUid = window.roamAlphaAPI.util.generateUID();
-    window.roamAlphaAPI.createBlock({
-      location: { "parent-uid": uid, order: position },
-      block: { uid: totalUid, string: value },
-    });
-    window.roamAlphaAPI.updateBlock({
-      block: {
-        uid: uid,
-        string: getBlockContent(uid) + "((" + totalUid + "))",
-      },
-    });
-    return totalUid;
-  }
+    return total;
+  } else return 0;
 }
 
-function insertTotalTimeByCategory(uid, output, isSub = false) {
-  for (let i = 0; i < output.children.length; i++) {
-    if (output.children[i] != undefined) {
-      let catUid = window.roamAlphaAPI.util.generateUID();
-      window.roamAlphaAPI.createBlock({
-        location: { "parent-uid": uid, order: i },
-        block: { uid: catUid, string: output.children[i].getText() },
-      });
-      if (output.children[i].children.length != 0)
-        insertTotalTimeByCategory(catUid, output.children[i], true);
-    }
-  }
-  if (uncategorized != 0 && !isSub && output.children.length != 0) {
-    window.roamAlphaAPI.createBlock({
-      location: { "parent-uid": uid, order: output.children.length },
-      block: { string: formatDisplayTime(null, "__Uncategorized__", "") },
-    });
-  }
-  return;
-}
-
-// TOTAL TIME BY CATEGORIES ON A GIVEN PERIOD
+/*=======================================================================*/
+// TOTAL TIME ON A GIVEN PERIOD
+/*=======================================================================*/
 
 class DailyLog {
   constructor(target = "categories") {
     this.target = target;
     this.dayLogs = [];
     this.firstLogDay = null;
-    this.firstLogDay = null;
+    this.lastLogDay = null;
     this.totals = [];
   }
   initDayLogs() {
@@ -471,19 +308,31 @@ class DayLog {
 
 export var mainDailyLog;
 
+export async function totalTimeForGivenPeriod(period, uid) {
+  if (!period) {
+    period = await getNbOfDaysFromBlock(uid);
+  }
+  let startUid = await getCurrentBlockUidOrCreateIt();
+  let total = await getTotalTimeFromPreviousDays(startUid, null, period);
+  displayTotalByPeriod(startUid, total, period);
+}
+
 export async function getTotalTimeFromPreviousDays(
+  currentBlockUid,
   today,
-  numberOfDays,
+  period,
   targetItem = null
 ) {
+  resetTotalTimes();
   let dnpUidArray = [];
   if (today === null) {
-    let pageUid = await getMainPageUid();
+    let pageUid = getPageUidByAnyBlockUid(currentBlockUid);
     let parsedTitle = Date.parse(pageUid);
     console.log(parsedTitle);
     isNaN(parsedTitle) ? (today = new Date()) : (today = new Date(parsedTitle));
   }
-  dnpUidArray = await getPreviousDailyLogs(today, numberOfDays);
+  console.log("Period:", period);
+  dnpUidArray = await getPreviousDailyLogs(today, period);
   console.log(dnpUidArray);
   let total = 0;
   let dailyLogs = new DailyLog();
@@ -492,36 +341,55 @@ export async function getTotalTimeFromPreviousDays(
     total += getTotaTimeInDailyLog(dayLog);
     dailyLogs.addDay(dayLog);
   });
-  //mainDailyLog = dailyLogs;
-  dailyLogs.sumByCategory("monthly");
-  mainDailyLog = dailyLogs.totals;
+  //  console.log(categoriesArray);
   return total;
-  //console.log(dailyLogs);
-  // dailyLogs.sumByCategory();
-  // //console.log(total);
-  // let displayTotal = formatDisplayTime({ time: total }, "", "");
-  // let totalOutput = getTriggeredTime(displayTotal);
-  // let totalUid = insertTotalTime("2Wzi4z-Mx", totalOutput.text, -1);
-  // insertTriggeredTime(totalUid, totalOutput);
 }
 
 export function displayTotalByPeriod(uid, total, period) {
-  let displayTotal = formatDisplayTime(
-    { time: total },
-    "Total time / " + period,
-    ""
-  );
-  let totalOutput = getTriggeredTime(displayTotal);
-  let totalUid = insertTotalTime(uid, totalOutput.text, -1);
-  insertTriggeredTime(totalUid, totalOutput);
+  let totalOutput = getTotalTimeOutput(total, period);
+  let totalUid = prepareTotalTimeInsersion(uid, totalOutput.text, -1);
+  displayTotalAsTable
+    ? insertTableOfTotalByCategory(totalOutput, totalUid, "", 0)
+    : insertTotalTimeByCategory(totalUid, totalOutput);
+  if (totalOutput.children.length != 0) copyTotalToClipboard();
 }
 
-async function getPreviousDailyLogs(today, number) {
+async function getPreviousDailyLogs(today, period) {
+  let dateFlag = 0;
+  let nbOfDays, limitedNb;
+  if (isNaN(period)) {
+    if (period.includes("last ")) {
+      period = period.replace("last ", "");
+      today = getLastDayOfPreviousPeriod(today, period);
+      console.log("last day of previous period", today);
+    }
+    limitedNb = true;
+    nbOfDays = convertPeriodInNumberOfDays(period);
+    switch (period) {
+      case "week":
+        dateFlag = getWeekNumber(today);
+        break;
+      case "month":
+        dateFlag = today.getMonth();
+        break;
+      case "quarter":
+        dateFlag = getQuarter(today);
+        break;
+      case "year":
+        dateFlag = today.getFullYear();
+        break;
+    }
+  } else {
+    console.log(period);
+    limitedNb = false;
+    nbOfDays = period;
+  }
   let dnpUidArray = [];
   dnpUidArray.push(window.roamAlphaAPI.util.dateToPageUid(today));
   let yesterday;
-  for (let i = 0; i < number; i++) {
+  for (let i = limitedNb ? 0 : 1; i < nbOfDays; i++) {
     yesterday = getYesterdayDate(today);
+    if (limitedNb && !dateIsInPeriod(yesterday, period, dateFlag)) break;
     let uid = window.roamAlphaAPI.util.dateToPageUid(yesterday);
     dnpUidArray.push(uid);
     today = yesterday;
@@ -533,135 +401,35 @@ export function getTotaTimeInDailyLog(dayLog) {
   // let daylog = new DayLog(day);
   let dayTree = getChildrenTree(dayLog.day);
   if (!dayTree) return 0;
-  else dayTree.flat(Infinity);
+  // else dayTree.flat(Infinity);
   console.log(dayTree);
-  let stringified = JSON.stringify(dayTree); //.split('"string":"');
-  if (dayLog.target && !stringified.includes(dayLog.target)) return 0;
-  if (extractElapsedTime(stringified)) {
-    let total = getTimesFromArray(stringified.split('"string":"'), dayLog);
-    return total;
-  } else return 0;
+  directChildrenProcess(dayTree);
+  //console.log("Etat pour le " + dayLog.day);
+  //console.log(categoriesArray);
+  return 0;
+  // let stringified = JSON.stringify(dayTree); //.split('"string":"');
+  // if (dayLog.target && !stringified.includes(dayLog.target)) return 0;
+  // if (extractElapsedTime(stringified)) {
+  //   let total = getTimesFromArray(stringified.split('"string":"'), dayLog);
+  //   return total;
+  // } else return 0;
 }
 
-function getTotalTimeInTree(tree) {
-  let stringified = JSON.stringify(tree); //.split('"string":"');
-  if (extractElapsedTime(stringified)) {
-    let total = 0;
-    stringified.split('"string":"').forEach((string) => {
-      let result = extractElapsedTime(string);
-      if (!result) {
-        result = extractPomodoro(string);
-      }
-      total += !result ? 0 : parseInt(result);
-    });
-    return total;
-  } else return 0;
-}
-
-function getTimesFromArray(array, dayLog) {
-  let total = 0;
-  uncategorized = 0;
-  array.forEach((block) => {
-    let result = extractElapsedTime(block);
-    if (!result) result = 0;
-    else {
-      if (dayLog.target) {
-        if (!block.includes(dayLog.target)) result = 0;
-      } else {
-        let uidSlice = block.split('"uid":"');
-        let refs = null;
-        if (uidSlice.length > 1)
-          refs = getBlocksUidReferencedInThisBlock(uidSlice[1].slice(0, 9));
-        let triggerIndex = scanCategories(
-          block,
-          refs,
-          getTriggerIndexes,
-          false
-        );
-        addTimeToCategory(triggerIndex, result, dayLog);
-      }
-    }
-    total += result;
-  });
-  return total;
-}
-
-function addTimeToCategory(triggerIndex, result, dayLog = null) {
-  if (triggerIndex.length > 0) {
-    if (triggerIndex[0][0] == -1) {
-      uncategorized += result;
-    } else {
-      let lastCat = 0;
-      let hasCatTag = false;
-      let indexStr = JSON.stringify(triggerIndex);
-      let isOnlyTag = false;
-      for (let j = 0; j < triggerIndex.length; j++) {
-        let index = triggerIndex[j];
-        let cat = categoriesArray[index[0]];
-        if (index[0] != lastCat) {
-          hasCatTag = false;
-        }
-        if (index[1] == -1) {
-          hasCatTag = true;
-          cat.time += result;
-          if (dayLog) dayLog.addLog(cat.name, result);
-        } else {
-          let sub = cat.children[index[1]];
-          if (!hasCatTag) {
-            if (indexStr.includes(",-1]")) {
-              let splLeft = indexStr.split(",-1]");
-              for (let k = 0; k < splLeft.length - 1; k++) {
-                let splRight = splLeft[k].split("[");
-                let catIndex = splRight[splRight.length - 1];
-                if (categoriesArray[catIndex].name == sub.name) {
-                  isOnlyTag = true;
-                }
-              }
-              if (!isOnlyTag) {
-                cat.time += result;
-                if (dayLog) dayLog.addLog(cat.name, result);
-              }
-            } else {
-              cat.time += result;
-              if (dayLog) dayLog.addLog(cat.name, result);
-            }
-            if (!isOnlyTag) {
-              sub.time += result;
-              if (dayLog) dayLog.addLog(sub.name, result);
-            }
-          } else {
-            let itsCat = JSON.stringify([index[0], -1]);
-            if (indexStr.includes(itsCat)) {
-              sub.time += result;
-              if (dayLog) dayLog.addLog(sub.name, result);
-            }
-          }
-        }
-        lastCat = index[0];
-      }
-    }
-  }
-}
+/*========================================================================*/
+// TOTAL TIME FOR A GIVEN PAGE REFERENCE IN WHOLE GRAPH
+/*========================================================================*/
 
 export async function getTotalTimeForCurrentPage() {
   //let pageTitle = getMainPageUid
   let pageUid = getPageUidByTitle("piano");
   let blocks = getBlocksIncludingRef(pageUid);
   let durationsTab = getBlocksContentWithDuration(blocks);
-  let s = sum(durationsTab);
+  let s = sumOfArrayElements(durationsTab);
   //let total = formatDisplayTime(s);
   console.log(durationsTab);
   console.log(s);
 
-  dailyLog.dayLogs.push();
-}
-
-function sum(t) {
-  let s = 0;
-  for (let i = 0; i < t.length; i++) {
-    s += t[i];
-  }
-  return s;
+  DailyLog.dayLogs.push();
 }
 
 function getBlocksContentWithDuration(b) {
@@ -690,4 +458,243 @@ function hasElapsedTimeInChildren(tree) {
   if (extractElapsedTime(stringified)) {
     return true;
   } else return false;
+}
+
+/*========================================================================*/
+// FUNCTIONS FOR OUTPUT AND DISPLAY TOTALS
+/*========================================================================*/
+class Output {
+  constructor(s, n, t = 0) {
+    this.text = s;
+    this.name = n;
+    this.time = t;
+    this.children = [];
+  }
+
+  setChildren(t) {
+    this.children = t;
+  }
+  addChild(child) {
+    this.children.push(child);
+  }
+  getText() {
+    return this.text;
+  }
+}
+
+function formatDisplayTime(w, title, formatTag, hide = false) {
+  let t;
+  let l = "";
+  if (w != null) {
+    t = w.time;
+    l = displayLimit(w);
+  } else t = uncategorized;
+  if (title == "") {
+    return totalTitle
+      .replace("<tm>", t.toString())
+      .replace("<th>", convertMinutesTohhmm(t));
+  } else if (title.includes("period:")) {
+    return (
+      totalTitle
+        .replace("<tm>", t.toString())
+        .replace("<th>", convertMinutesTohhmm(t)) + ` ${title.slice(7)}`
+    );
+  }
+  if (hide) return title;
+  return (
+    totalFormat
+      .replace("<category>", title)
+      .replace("<tm>", t.toString())
+      .replace("<th>", convertMinutesTohhmm(t))
+      .replace("<limit>", l)
+      .trim() +
+    " " +
+    formatTag
+  );
+}
+
+function displayLimit(w) {
+  let flag = "";
+  let comp = "";
+  if (w.limit != null) {
+    if (w.limit.type != "undefined" && w.limit.day != 0) {
+      if (w.limit.type == "goal") {
+        if (w.time >= w.limit.day) {
+          flag = limitFlag.day.goal.success;
+          comp = ">=";
+        } else {
+          flag = limitFlag.day.goal.failure;
+          comp = "<";
+        }
+      } else if (w.limit.type == "limit") {
+        if (w.time <= w.limit.day) {
+          flag = limitFlag.day.limit.success;
+          comp = "<=";
+        } else {
+          flag = limitFlag.day.limit.failure;
+          comp = ">";
+        }
+      }
+      let r = limitFormat.replace("<type>", w.limit.type);
+      r = r.replace("<value>", w.limit.day.toString());
+      r = r.replace("<comp>", comp);
+      r = r.replace("<flag>", flag);
+      return r;
+    }
+  }
+  return "";
+}
+
+function getTotalTimeOutput(total, period = null) {
+  if (period && isNaN(period)) {
+    if (!period.includes("last")) period = `period: in current ${period}`;
+    else period = `period: ${period}`;
+  } else if (period && !isNaN(period))
+    period = "period: since " + period + " days:";
+  else period = "";
+
+  let totalToBeCalculated = false;
+  let displayTotal;
+  if (total != 0) displayTotal = formatDisplayTime({ time: total }, period, "");
+  else totalToBeCalculated = true;
+  let totalOutput = new Output(displayTotal);
+  let parentCategories = categoriesArray.filter((cat) => !cat.parent);
+  parentCategories.forEach((parent) => {
+    setCategoryOutput(parent, totalOutput);
+    total += parent.time;
+  });
+  if (totalToBeCalculated)
+    displayTotal = formatDisplayTime({ time: total }, period, "");
+  totalOutput.time = total;
+  totalOutput.text = displayTotal;
+  return totalOutput;
+}
+
+function setCategoryOutput(category, parentOutput) {
+  if (category.time != 0) {
+    let title;
+    if (titleIsRef && category.type === "text") {
+      title = "((" + category.uid + "))";
+    } else {
+      title = category.name;
+    }
+    let hideTime = false;
+    //if (displaySubCat && categoriesArray[i].children.length === 1) hideTime = true;
+    let formatedCatTotal = formatDisplayTime(
+      category,
+      title,
+      category.format,
+      hideTime
+    );
+    let output = new Output(formatedCatTotal, title, category.time);
+    parentOutput.addChild(output);
+    if (displaySubCat && category.children) {
+      category.children.forEach((child) => setCategoryOutput(child, output));
+    }
+  }
+}
+
+function prepareTotalTimeInsersion(uid, value, position) {
+  if (position == -1) {
+    window.roamAlphaAPI.updateBlock({
+      block: { uid: uid, string: value },
+    });
+    return uid;
+  } else {
+    let totalUid = window.roamAlphaAPI.util.generateUID();
+    window.roamAlphaAPI.createBlock({
+      location: { "parent-uid": uid, order: position },
+      block: { uid: totalUid, string: value },
+    });
+    window.roamAlphaAPI.updateBlock({
+      block: {
+        uid: uid,
+        string: getBlockContent(uid) + "((" + totalUid + "))",
+      },
+    });
+    return totalUid;
+  }
+}
+
+function insertTotalTimeByCategory(uid, output, isSub = false) {
+  for (let i = 0; i < output.children.length; i++) {
+    if (output.children[i] != undefined) {
+      let catUid = window.roamAlphaAPI.util.generateUID();
+      window.roamAlphaAPI.createBlock({
+        location: { "parent-uid": uid, order: i },
+        block: { uid: catUid, string: output.children[i].getText() },
+      });
+      if (output.children[i].children.length != 0)
+        insertTotalTimeByCategory(catUid, output.children[i], true);
+    }
+  }
+  if (uncategorized != 0 && !isSub && output.children.length != 0) {
+    window.roamAlphaAPI.createBlock({
+      location: { "parent-uid": uid, order: output.children.length },
+      block: { string: formatDisplayTime(null, "__Uncategorized__", "") },
+    });
+  }
+  return;
+}
+
+function getListOfTotalByCategory(categories, shift = "") {
+  categories.forEach((cat) => {
+    if (cat.time != 0)
+      outputForClipboard += shift + cat.name + "\t" + cat.time + "\n";
+    if (cat.time != 0 && cat.children != undefined) {
+      getListOfTotalByCategory(cat.children, shift + "   ");
+    }
+  });
+}
+
+function insertTableOfTotalByCategory(
+  output,
+  parentUid,
+  shift = "",
+  order = "last"
+) {
+  if (order == 0) {
+    window.roamAlphaAPI.updateBlock({
+      block: { uid: parentUid, string: output.text + "{{table}}", open: false },
+    });
+    let titleUid = window.roamAlphaAPI.util.generateUID();
+    simpleCreateBlock(parentUid, titleUid, "Category");
+    simpleCreateBlock(titleUid, null, "Time in mn");
+    order = "last";
+    setTimeout(() => {
+      simulateClick(document.querySelector(".roam-article"));
+    }, 100);
+  }
+  if (output.children.length > 0)
+    output.children.forEach((cat) => {
+      let nameUid = window.roamAlphaAPI.util.generateUID();
+      simpleCreateBlock(parentUid, nameUid, shift + cat.name);
+      // window.roamAlphaAPI.createBlock({
+      //   location: { "parent-uid": parentUid, order: order },
+      //   block: { uid: nameUid, string: string },
+      // });
+      let timeUid = window.roamAlphaAPI.util.generateUID();
+      simpleCreateBlock(
+        nameUid,
+        timeUid,
+        totalFormat.includes("<th>")
+          ? convertMinutesTohhmm(cat.time)
+          : cat.time.toString()
+      );
+      // window.roamAlphaAPI.createBlock({
+      //   location: { "parent-uid": nameUid, order: order },
+      //   block: { uid: timeUid, string: time },
+      // });
+      if (cat.children.length > 0) {
+        insertTableOfTotalByCategory(cat, parentUid, shift + "   ");
+      }
+    });
+}
+
+function copyTotalToClipboard() {
+  if (autoCopyTotalToClipboard) {
+    getListOfTotalByCategory(categoriesArray.filter((cat) => !cat.parent));
+    navigator.clipboard.writeText(outputForClipboard);
+    simpleIziMessage("Total times copied to clipboard in a simple table");
+  }
 }
