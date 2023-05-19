@@ -1,10 +1,8 @@
 import {
   displaySubCat,
-  durationFormat,
   durationRegex,
   limitFlag,
   limitFormat,
-  splittedDurationFormat,
   totalFormat,
   totalTitle,
   categoriesRegex,
@@ -16,7 +14,6 @@ import { simpleIziMessage } from "./elapsedTime";
 import {
   convertMinutesTohhmm,
   convertPeriodInNumberOfDays,
-  createBlock,
   dateIsInPeriod,
   getBlockContent,
   getBlocksIncludingRef,
@@ -25,7 +22,6 @@ import {
   getLastDayOfPreviousPeriod,
   getNbOfDaysFromBlock,
   getPageUidByAnyBlockUid,
-  getPageUidByTitle,
   getParentUID,
   getQuarter,
   getWeek,
@@ -33,7 +29,6 @@ import {
   getYesterdayDate,
   simpleCreateBlock,
   simulateClick,
-  sumOfArrayElements,
 } from "./util";
 
 const pomodoroRegex = /\{\{\[?\[?POMO\]?\]?: ?([0-9]*)\}\}/;
@@ -53,17 +48,25 @@ export async function totalTime(currentUID, scopeUid, byCategories = true) {
   let total = 0;
   resetTotalTimes();
   let parentUID;
-  let blockTree = getChildrenTree(currentUID);
+  let blockTree;
   let position = -1;
-  if (blockTree) {
-    position = blockTree.length;
+  if (currentUID) {
+    blockTree = getChildrenTree(currentUID);
+    if (blockTree) {
+      position = blockTree.length;
+    } else {
+      parentUID = getParentUID(currentUID);
+      blockTree = getChildrenTree(parentUID);
+    }
   } else {
-    parentUID = getParentUID(currentUID);
-    blockTree = getChildrenTree(parentUID);
+    currentUID = await getCurrentBlockUidOrCreateIt();
+    // console.log("current:", currentUID);
+    scopeUid = getPageUidByAnyBlockUid(currentUID);
   }
+  //console.log("scope:", scopeUid);
   if (byCategories) {
     blockTree = getChildrenTree(scopeUid);
-    total = await directChildrenProcess(blockTree);
+    await directChildrenProcess(blockTree);
   } else total = getTotalTimeInTree(blockTree);
   let totalOutput = getTotalTimeOutput(total);
   let totalUid = prepareTotalTimeInsersion(
@@ -71,20 +74,20 @@ export async function totalTime(currentUID, scopeUid, byCategories = true) {
     totalOutput.text,
     position
   );
-  displayTotalAsTable
-    ? insertTableOfTotalByCategory(totalOutput, totalUid, "", 0)
-    : insertTotalTimeByCategory(totalUid, totalOutput);
-  if (totalOutput.time != 0 && totalOutput.children.length != 0)
-    copyTotalToClipboard();
+  if (byCategories) {
+    displayTotalAsTable
+      ? insertTableOfTotalByCategory(totalOutput, totalUid, "", 0)
+      : insertTotalTimeByCategory(totalUid, totalOutput);
+    if (totalOutput.time != 0 && totalOutput.children.length != 0)
+      copyTotalToClipboard();
+  }
 }
 
 function resetTotalTimes() {
   uncategorized = 0;
   outputForClipboard = "";
-  totalPomo = {
-    nb: 0,
-    time: 0,
-  };
+  totalPomo.nb = 0;
+  totalPomo.time = 0;
   for (let i = 0; i < categoriesArray.length; i++) {
     categoriesArray[i].time = 0;
     if (categoriesArray[i].children) {
@@ -96,8 +99,8 @@ function resetTotalTimes() {
 }
 
 async function directChildrenProcess(tree, parentBlockCat = null) {
-  let total = 0;
   //console.log(categoriesArray);
+  let total = 0;
   if (tree) {
     let length = tree.length;
     for (let i = 0; i < length; i++) {
@@ -108,7 +111,7 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
       let pomo = extractPomodoro(blockContent);
       if (pomo) {
         totalPomo.nb++;
-        totalPomo.time += parseInt(pomo);
+        totalPomo.time += pomo;
       }
       if (!time) time = pomo ? pomo[1] : null;
       //console.log(categoriesRegex);
@@ -129,16 +132,17 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
         }
         parentBlockCat = triggeredCat ? triggeredCat[0] : parentBlockCat;
       } else {
-        time = parseInt(time);
+        //  time = parseInt(time);
         if (triggeredCat) triggeredCat.forEach((cat) => cat.addTime(time));
         else if (parentBlockCat) parentBlockCat.addTime(time);
         else uncategorized += time;
         processChildren = false;
+        total += parseInt(time);
       }
       if (processChildren && tree[i].children) {
         // console.log("parentBlockCat");
         // console.log(parentBlockCat);
-        directChildrenProcess(tree[i].children, parentBlockCat);
+        total += await directChildrenProcess(tree[i].children, parentBlockCat);
       }
     }
   }
@@ -215,10 +219,11 @@ function addOnlySupCatIfSynonym(cat, lastCatName, catArray) {
 function extractPomodoro(content) {
   let result = content.match(pomodoroRegex);
   if (result) result = result[1];
-  return result;
+  return parseInt(result);
 }
 
-function getTotalTimeInTree(tree) {
+function getTotalTimeInTree(tree, uidToExclude = null) {
+  if (!tree) return 0;
   let stringified = JSON.stringify(tree); //.split('"string":"');
   if (extractElapsedTime(stringified)) {
     let total = 0;
@@ -227,7 +232,12 @@ function getTotalTimeInTree(tree) {
       if (!result) {
         result = extractPomodoro(string);
       }
-      total += !result ? 0 : parseInt(result);
+      if (
+        uidToExclude &&
+        uidToExclude.includes(string.split('"uid":"')[1]?.slice(0, 9))
+      )
+        result = 0;
+      total += !result ? 0 : result;
     });
     return total;
   } else return 0;
@@ -313,8 +323,10 @@ export async function totalTimeForGivenPeriod(period, uid) {
     period = await getNbOfDaysFromBlock(uid);
   }
   let startUid = await getCurrentBlockUidOrCreateIt();
-  let total = await getTotalTimeFromPreviousDays(startUid, null, period);
-  displayTotalByPeriod(startUid, total, period);
+  setTimeout(async () => {
+    let total = await getTotalTimeFromPreviousDays(startUid, null, period);
+    displayTotalByPeriod(startUid, total, period);
+  }, 50);
 }
 
 export async function getTotalTimeFromPreviousDays(
@@ -328,12 +340,10 @@ export async function getTotalTimeFromPreviousDays(
   if (today === null) {
     let pageUid = getPageUidByAnyBlockUid(currentBlockUid);
     let parsedTitle = Date.parse(pageUid);
-    console.log(parsedTitle);
     isNaN(parsedTitle) ? (today = new Date()) : (today = new Date(parsedTitle));
   }
-  console.log("Period:", period);
   dnpUidArray = await getPreviousDailyLogs(today, period);
-  console.log(dnpUidArray);
+  //console.log(dnpUidArray);
   let total = 0;
   let dailyLogs = new DailyLog();
   dnpUidArray.forEach((day) => {
@@ -419,34 +429,27 @@ export function getTotaTimeInDailyLog(dayLog) {
 // TOTAL TIME FOR A GIVEN PAGE REFERENCE IN WHOLE GRAPH
 /*========================================================================*/
 
-export async function getTotalTimeForCurrentPage() {
-  //let pageTitle = getMainPageUid
-  let pageUid = getPageUidByTitle("piano");
-  let blocks = getBlocksIncludingRef(pageUid);
-  let durationsTab = getBlocksContentWithDuration(blocks);
-  let s = sumOfArrayElements(durationsTab);
-  //let total = formatDisplayTime(s);
-  console.log(durationsTab);
-  console.log(s);
+export function getTotalTimeForCurrentPage(triggerUid, pageUid) {
+  let total = 0;
+  total += getTotalTimeInTree(getChildrenTree(pageUid));
 
-  DailyLog.dayLogs.push();
-}
-
-function getBlocksContentWithDuration(b) {
-  let tab = [];
-  let dFormat = [...splittedDurationFormat];
-  for (let i = 0; i < b.length; i++) {
-    if (b[i][1].includes(dFormat[0]) && b[i][1].includes(dFormat[1])) {
-      tab.push(extractElapsedTime(b[i][1]));
-    }
-  }
-  return tab;
+  let references = getBlocksIncludingRef(pageUid);
+  references = references.filter((b) => b[0] != pageUid && b[2] != pageUid);
+  let uidToExclude = references.map((b) => b[0]);
+  references.forEach((ref) => {
+    let time = extractElapsedTime(ref[1]);
+    total += time
+      ? time
+      : getTotalTimeInTree(getChildrenTree(ref[0]), uidToExclude);
+  });
+  let totalOutput = getTotalTimeOutput(total);
+  let totalUid = prepareTotalTimeInsersion(triggerUid, totalOutput.text);
 }
 
 function extractElapsedTime(content) {
   let match = content.match(durationRegex);
   if (match) {
-    return match[1];
+    return parseInt(match[1]);
   }
   return null;
 }
@@ -563,6 +566,15 @@ function getTotalTimeOutput(total, period = null) {
     setCategoryOutput(parent, totalOutput);
     total += parent.time;
   });
+  if (uncategorized != 0)
+    totalOutput.addChild(
+      new Output(
+        formatDisplayTime(null, "__Uncategorized__", ""),
+        "Uncategorized",
+        uncategorized
+      )
+    );
+  total += uncategorized;
   if (totalToBeCalculated)
     displayTotal = formatDisplayTime({ time: total }, period, "");
   totalOutput.time = total;
@@ -578,8 +590,13 @@ function setCategoryOutput(category, parentOutput) {
     } else {
       title = category.name;
     }
-    let hideTime = false;
-    //if (displaySubCat && categoriesArray[i].children.length === 1) hideTime = true;
+    let hideTime =
+      displaySubCat &&
+      category.children &&
+      category.children.filter((cat) => cat.time != 0).length === 1 &&
+      category.children.filter((cat) => cat.time != 0)[0].time === category.time
+        ? true
+        : false;
     let formatedCatTotal = formatDisplayTime(
       category,
       title,
@@ -594,7 +611,7 @@ function setCategoryOutput(category, parentOutput) {
   }
 }
 
-function prepareTotalTimeInsersion(uid, value, position) {
+function prepareTotalTimeInsersion(uid, value, position = -1) {
   if (position == -1) {
     window.roamAlphaAPI.updateBlock({
       block: { uid: uid, string: value },
@@ -654,12 +671,15 @@ function insertTableOfTotalByCategory(
   order = "last"
 ) {
   if (order == 0) {
+    console.log(output.time);
+    let tableComponent = output.time == 0 ? "" : "\n{{table}}";
     window.roamAlphaAPI.updateBlock({
-      block: { uid: parentUid, string: output.text + "{{table}}", open: false },
+      block: {
+        uid: parentUid,
+        string: output.text + tableComponent,
+        open: false,
+      },
     });
-    let titleUid = window.roamAlphaAPI.util.generateUID();
-    simpleCreateBlock(parentUid, titleUid, "Category");
-    simpleCreateBlock(titleUid, null, "Time in mn");
     order = "last";
     setTimeout(() => {
       simulateClick(document.querySelector(".roam-article"));
@@ -667,24 +687,14 @@ function insertTableOfTotalByCategory(
   }
   if (output.children.length > 0)
     output.children.forEach((cat) => {
+      let format = shift === "" ? "**" : "";
       let nameUid = window.roamAlphaAPI.util.generateUID();
-      simpleCreateBlock(parentUid, nameUid, shift + cat.name);
-      // window.roamAlphaAPI.createBlock({
-      //   location: { "parent-uid": parentUid, order: order },
-      //   block: { uid: nameUid, string: string },
-      // });
+      simpleCreateBlock(parentUid, nameUid, format + shift + cat.name + format);
       let timeUid = window.roamAlphaAPI.util.generateUID();
-      simpleCreateBlock(
-        nameUid,
-        timeUid,
-        totalFormat.includes("<th>")
-          ? convertMinutesTohhmm(cat.time)
-          : cat.time.toString()
-      );
-      // window.roamAlphaAPI.createBlock({
-      //   location: { "parent-uid": nameUid, order: order },
-      //   block: { uid: timeUid, string: time },
-      // });
+      let time = totalFormat.includes("<th>")
+        ? convertMinutesTohhmm(cat.time)
+        : cat.time.toString();
+      simpleCreateBlock(nameUid, timeUid, format + time + format);
       if (cat.children.length > 0) {
         insertTableOfTotalByCategory(cat, parentUid, shift + "   ");
       }

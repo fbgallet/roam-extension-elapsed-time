@@ -77,12 +77,18 @@ export async function getMainPageUid() {
 }
 
 export function getPageUidByAnyBlockUid(blockUid) {
-  let pageUid = window.roamAlphaAPI.pull("[{:block/page [:block/uid]}]", [
+  let pageUid = window.roamAlphaAPI.data.pull("[{:block/page [:block/uid]}]", [
     ":block/uid",
     blockUid,
   ]);
   if (pageUid === null) return blockUid;
   return pageUid[":block/page"][":block/uid"];
+}
+export function getPageTitleByBlockUid(uid) {
+  return window.roamAlphaAPI.pull("[{:block/page [:block/uid :node/title]}]", [
+    ":block/uid",
+    uid,
+  ])[":block/page"][":node/title"];
 }
 
 export function getPageUidByTitle(title) {
@@ -100,8 +106,10 @@ export function getPageUidByPageName(page) {
 
 export function getBlocksIncludingRef(uid) {
   return window.roamAlphaAPI.q(
-    `[:find ?u ?s
+    `[:find ?u ?s ?uidp
          :where [?r :block/uid ?u]
+              [?r :block/page ?p]
+              [?p :block/uid ?uidp]
               [?r :block/refs ?b]
                 [?r :block/string ?s]
             [?b :block/uid "${uid}"]]`

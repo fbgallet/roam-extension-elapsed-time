@@ -1,4 +1,4 @@
-import { displayTotalTimesTable } from "./components";
+//import { displayTotalTimesTable } from "./components";
 import {
   createCategoriesBlock,
   createLimitsBlock,
@@ -6,10 +6,7 @@ import {
 } from "./data";
 import { elapsedTime } from "./elapsedTime";
 import {
-  displayTotalByPeriod,
-  extractDailyLog,
   getTotalTimeForCurrentPage,
-  getTotalTimeFromPreviousDays,
   totalTime,
   totalTimeForGivenPeriod,
 } from "./totalTime";
@@ -19,7 +16,6 @@ import {
   getBlockAttributes,
   getChildrenTree,
   getCurrentBlockUidOrCreateIt,
-  getNbOfDaysFromBlock,
   getPageUidByAnyBlockUid,
   getRegexFromArray,
   getStringsAroundPlaceHolder,
@@ -332,63 +328,77 @@ function setDurationRegex() {
 
 function registerPaletteCommands(extensionAPI) {
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Elapsed time",
+    label: "Time Tracker: Elapsed time in current block",
     callback: () => {
       const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
       elapsedTime(startUid);
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Elapsed time: Total in current page, by categories",
-    callback: () => {
-      const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
-      totalTime(startUid, getPageUidByAnyBlockUid(startUid));
+    label: "Time Tracker: Total in the entire page, by categories",
+    callback: async () => {
+      let startUid = await getCurrentBlockUidOrCreateIt();
+      setTimeout(() => {
+        let scopeUid = getPageUidByAnyBlockUid(startUid);
+        totalTime(startUid, scopeUid);
+      }, 50);
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Elapsed time: Total without detail in children or sibbling blocks",
+    label: "Time Tracker: simple Total in context (sibbling/children blocks)",
     callback: () => {
       const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
       totalTime(startUid, startUid, false);
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Elapsed time: Total for current week",
+    label: "Time Tracker: Total for current week",
     callback: async () => {
       totalTimeForGivenPeriod("week");
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Elapsed time: Total for current month",
+    label: "Time Tracker: Total for current month",
     callback: async () => {
       totalTimeForGivenPeriod("month");
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Elapsed time: Total for current quarter",
+    label: "Time Tracker: Total for current quarter",
     callback: async () => {
       totalTimeForGivenPeriod("quarter");
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Elapsed time: Total for current year",
+    label: "Time Tracker: Total for current year",
     callback: async () => {
       totalTimeForGivenPeriod("year");
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Elapsed time: Total according to the expression in current block",
+    label:
+      "Time Tracker: Total according to natural language expression in current block",
     callback: () => {
       const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
       if (!startUid) return;
       totalTimeForGivenPeriod(null, startUid);
     },
   });
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Time Tracker: Total for current page and all its references",
+    callback: () => {
+      let startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
+      // setTimeout(() => {
+      let scopeUid = getPageUidByAnyBlockUid(startUid);
+      getTotalTimeForCurrentPage(startUid, scopeUid);
+      // }, 50);
+    },
+  });
 
   // TODO
   //
   // extensionAPI.ui.commandPalette.addCommand({
-  //   label: "Elapsed time: Total time in table",
+  //   label: "Time Tracker: Total time in table",
   //   callback: async () => {
   //     let total = await getTotalTimeFromPreviousDays(null, 31);
   //     displayTotalTimesTable();
@@ -399,7 +409,7 @@ function registerPaletteCommands(extensionAPI) {
     addOpenCategoriesCommand(extensionAPI);
   } else {
     extensionAPI.ui.commandPalette.addCommand({
-      label: "Elapsed time: Set categories list, goals & limits",
+      label: "Time Tracker: Set categories list, goals & limits",
       callback: async () => {
         let pageUid = await createSettingsPage(extensionAPI);
         await createCategoriesBlock(pageUid, extensionAPI);
@@ -416,7 +426,7 @@ function registerPaletteCommands(extensionAPI) {
 
 function addOpenCategoriesCommand(extensionAPI) {
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Elapsed time: Open categories list in sidebar",
+    label: "Time Tracker: Open categories list in sidebar",
     callback: async () => {
       window.roamAlphaAPI.ui.rightSidebar.addWindow({
         window: { type: "block", "block-uid": categoriesUID },
@@ -427,7 +437,7 @@ function addOpenCategoriesCommand(extensionAPI) {
 
 function addOpenLimitsCommand(extensionAPI) {
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Elapsed time: Open goals & limits in sidebar",
+    label: "Time Tracker: Open goals & limits in sidebar",
     callback: async () => {
       window.roamAlphaAPI.ui.rightSidebar.addWindow({
         window: { type: "block", "block-uid": limitsUID },
@@ -455,8 +465,6 @@ function registerSmartblocksCommands(extensionAPI) {
     handler:
       (context) =>
       async (period = null, byCategories = true) => {
-        console.log(context.variables);
-        console.log(period);
         //period = context.variables.period;
         if (!period)
           totalTime(
@@ -468,42 +476,42 @@ function registerSmartblocksCommands(extensionAPI) {
         return "";
       },
   };
-  const updCatCmd = {
-    text: "UPDATECATSFORET",
-    help: "Update categories/subcategories and parent block reference for Elapsed Time extension. 1. Block reference of the parent block.",
-    handler: (context) => () => {
-      categoriesUID = context.variables.triggerUID;
-      panel.settings.set("categoriesSetting", categoriesUID);
-      getCategories(normalizeUID(categoriesUID));
-      return "";
-    },
-  };
-  const updLimCmd = {
-    text: "UPDATELIMITSFORET",
-    help: "Update Goals/Limits and parent block reference for Elapsed Time extension. 1. Block reference of the parent block.",
-    handler: (context) => () => {
-      limitsUID = context.variables.triggerUID;
-      panel.settings.set("limitsSetting", limitsUID);
-      getLimits(normalizeUID(limitsUID));
-      return "";
-    },
-  };
+  // const updCatCmd = {
+  //   text: "UPDATECATSFORET",
+  //   help: "Update categories/subcategories and parent block reference for Elapsed Time extension. 1. Block reference of the parent block.",
+  //   handler: (context) => () => {
+  //     categoriesUID = context.variables.triggerUID;
+  //     panel.settings.set("categoriesSetting", categoriesUID);
+  //     getCategories(normalizeUID(categoriesUID));
+  //     return "";
+  //   },
+  // };
+  // const updLimCmd = {
+  //   text: "UPDATELIMITSFORET",
+  //   help: "Update Goals/Limits and parent block reference for Elapsed Time extension. 1. Block reference of the parent block.",
+  //   handler: (context) => () => {
+  //     limitsUID = context.variables.triggerUID;
+  //     panel.settings.set("limitsSetting", limitsUID);
+  //     getLimits(normalizeUID(limitsUID));
+  //     return "";
+  //   },
+  // };
 
   if (window.roamjs?.extension?.smartblocks) {
     window.roamjs.extension.smartblocks.registerCommand(elapCmd);
     window.roamjs.extension.smartblocks.registerCommand(totalCmd);
-    window.roamjs.extension.smartblocks.registerCommand(updCatCmd);
-    window.roamjs.extension.smartblocks.registerCommand(updLimCmd);
+    // window.roamjs.extension.smartblocks.registerCommand(updCatCmd);
+    // window.roamjs.extension.smartblocks.registerCommand(updLimCmd);
   } else {
     document.body.addEventListener(`roamjs:smartblocks:loaded`, () => {
       window.roamjs?.extension.smartblocks &&
         window.roamjs.extension.smartblocks.registerCommand(elapCmd);
       window.roamjs?.extension.smartblocks &&
         window.roamjs.extension.smartblocks.registerCommand(totalCmd);
-      window.roamjs?.extension.smartblocks &&
-        window.roamjs.extension.smartblocks.registerCommand(updCatCmd);
-      window.roamjs?.extension.smartblocks &&
-        window.roamjs.extension.smartblocks.registerCommand(updLimCmd);
+      // window.roamjs?.extension.smartblocks &&
+      //   window.roamjs.extension.smartblocks.registerCommand(updCatCmd);
+      // window.roamjs?.extension.smartblocks &&
+      //   window.roamjs.extension.smartblocks.registerCommand(updLimCmd);
     });
   }
 }
@@ -520,7 +528,7 @@ function correctUidInput(uid) {
 }
 
 const panelConfig = {
-  tabTitle: "Elapsed time calculator",
+  tabTitle: "Time Tracker",
   settings: [
     {
       id: "categoriesSetting",
@@ -586,14 +594,16 @@ const panelConfig = {
     },
     {
       id: "displayTotalSetting",
-      name: "Inline display as blocks",
-      description: "Display inline total as blocks or Roam {{table}}",
+      name: "Display total mode",
+      description:
+        "Display inline total as blocks outline or as Roam {{table}}",
       action: {
         type: "select",
         items: ["blocks", "table"],
         onChange: (sel) => {
-          if ((sel = "blocks")) displayTotalAsTable = false;
-          else displayTotalAsTable = true;
+          sel === "blocks"
+            ? (displayTotalAsTable = false)
+            : (displayTotalAsTable = true);
         },
       },
     },
@@ -668,7 +678,7 @@ const panelConfig = {
       id: "totalTitleSetting",
       name: "Total parent block format",
       description:
-        "Format of the 'Total time' parent block, <th> being the required placeholder for the total time value:",
+        "Format of the 'Total time' parent block, use <th> (time in hour) or <tm> (time in minutes) placeholder:",
       action: {
         type: "input",
         onChange: (evt) => {
@@ -680,7 +690,7 @@ const panelConfig = {
       id: "totalCatSetting",
       name: "Total per category format",
       description:
-        "Format of each category's 'Total time'. Placeholders: <th> for total time, <category> and <limit> for limit format defined below:",
+        "Format of each category's 'Total time'. Placeholders: <th> or <tm> for total time, <category> and <limit> for limit format defined below:",
       action: {
         type: "input",
         onChange: (evt) => {
@@ -733,12 +743,12 @@ export default {
         ? addPullWatch(limitsUID, getLimits)
         : extensionAPI.settings.set("limitsSetting", undefined);
     if (extensionAPI.settings.get("displayTotalSetting") == null)
-      extensionAPI.settings.set("button-setting", "blocks");
+      extensionAPI.settings.set("displayTotalSetting", "blocks");
     extensionAPI.settings.get("displayTotalSetting") === "blocks"
       ? (displayTotalAsTable = false)
       : (displayTotalAsTable = true);
     if (extensionAPI.settings.get("displaySetting") == null)
-      extensionAPI.settings.set("button-setting", true);
+      extensionAPI.settings.set("displaySetting", true);
     displaySubCat = extensionAPI.settings.get("displaySetting");
     if (extensionAPI.settings.get("flagsDropdown") == null)
       extensionAPI.settings.set("flagsDropdown", "🎯,⚠️,👍,🛑");
@@ -761,12 +771,12 @@ export default {
     splittedDurationFormat = getStringsAroundPlaceHolder(durationFormat, "<d>");
     setDurationRegex();
     if (extensionAPI.settings.get("totalTitleSetting") == null)
-      extensionAPI.settings.set("totalTitleSetting", "Total time: **(<th>)**");
+      extensionAPI.settings.set("totalTitleSetting", "Total time: **<th>**");
     totalTitle = extensionAPI.settings.get("totalTitleSetting");
     if (extensionAPI.settings.get("totalCatSetting") == null)
       extensionAPI.settings.set(
         "totalCatSetting",
-        "<category>: **(<th>)** <limit>"
+        "<category>: **<th>** <limit>"
       );
     totalFormat = extensionAPI.settings.get("totalCatSetting");
     if (extensionAPI.settings.get("limitFormatSetting") == null)

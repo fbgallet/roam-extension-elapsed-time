@@ -29,6 +29,7 @@ var appendHourTag = false; // add a tag with the round current hour, like #19:00
 /**********************************************************************/
 
 const timestampRegex = /[0-9]{1,2}:[0-9]{1,2}/g;
+const timestampButtonRegex = /{{[^\}]*:SmartBlock:[^\}]*buttons}}/;
 class TimeStamp {
   constructor(stringTT) {
     this.original = stringTT;
@@ -55,7 +56,25 @@ export async function elapsedTime(blockUID) {
   let blockContent = getBlockContent(blockUID);
   blockContent = blockContent.replace(" {{⇥🕞:SmartBlock:Elapsed time}}", "");
   let matchingTT = [...blockContent.matchAll(timestampRegex)];
-  if (!matchingTT) return;
+  if (matchingTT.length == 0) {
+    let now = new Date();
+    let nowTS = new TimeStamp(now.getHours() + ":" + now.getMinutes())
+      .normalizedTT;
+    let matchingButton = blockContent.match(timestampButtonRegex);
+    if (matchingButton) {
+      if (matchingButton[0].includes("Double"))
+        nowTS += " {{⇥🕞:SmartBlock:Elapsed time}}";
+      blockContent = blockContent.replace(matchingButton[0], nowTS);
+    } else blockContent = nowTS + " " + blockContent;
+    let focusedBlock = window.roamAlphaAPI.ui.getFocusedBlock();
+    updateBlock(blockUID, blockContent);
+    setTimeout(() => {
+      window.roamAlphaAPI.ui.setBlockFocusAndSelection({
+        location: focusedBlock,
+      });
+    }, 200);
+    return;
+  }
   let begin = new TimeStamp(matchingTT[0][0]);
   let end;
   let title = "";
