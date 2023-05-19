@@ -1,6 +1,7 @@
 # Time Tracker (formerly Elapsed Time Calculator)
 
 Easily **track the time spent on your activities and calculate the total time spent on them**, organized by categories and sub-categories (and so on), and see if predefined **limits or goals** are respected. Helps to implement **interstitial journaling**.
+
 Review total by day, week, month, quarter, year, or any given period of time.
 
 v.2 introduce a lot of new features, see [changelog here](https://github.com/fbgallet/roam-extension-elapsed-time/blob/main/CHANGELOG.md)
