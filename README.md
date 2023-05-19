@@ -16,7 +16,7 @@ All commands in command palette (Ctrl/Cmd + p) begin with "Time tracker: " and y
 
 ### Elapsed time
 Calculate and insert elapsed time between two timestamp. The `Elapsed time` command has different behaviors depending on the context:
-  - if the current block contains a timestamp, a second timestamp (now) will be added and the elapsped time calculated,
+  - if the current block contains a timestamp, a second timestamp (now) will be added and the elapsped time calculated and inserted just after the timestamps, in the format defined in the settings (by default: (**30'**) ),
   - if it contains already two timestamps, the elapsed time will be (re)calculated,
   - if there is no timestamp (or a Smartblock button for a timestamp), a timestamp (now) will be inserted,
 
@@ -25,18 +25,21 @@ Calculate and insert elapsed time between two timestamp. The `Elapsed time` comm
 Another way to insert easily timestamps and run this command is to use SmartBlocks command. For instructions, see 'SmartBlocks commands' section below.
 
 ### Total time
-Calculate:
-  - `total in the entire page, by categories`:
-  - `total for current week` or month, quarter, year: 
-  - `total according to natural language expression in current block`:
-  - `simple total in context (sibbling/children blocks)`:
-  - `total for current page and all its references`:
+Total is calculated as the sum of elapsed times (formated by Time tracker, not only double timestamps), and displayed in a customizable format (category: **30'**) and in a basic outline of blocks by default, but cat also be displayed in Roam {{table}} and is copied in the clipboard in a simple text format.
+
+Total is calculated can be calculated in different range of data or periods, depending on the command used:
+  - `total in the entire page, by categories`: total and subtotals are calculated by category. An elapsed time is added to one or more categories if they are in the same block or if a category (provided it is a reference page) is in a parent block (see "Categories, goals and limits configuration" for more information).
+  - `total for current week/month/quarter/year`: only days of the current week (or other period) are taken into account, relative to the Daily Note from which the command is run. If the command isn't run in a Daily Note, the reference is the current day. So, if you want to calculate the total of the last week, you can simply run the command in the corresponding sunday Daily Note.
+  - `total according to natural language expression in current block`: simply write in natural language a period of time to be taken into account, relative to the Daily Note where you write, and run the command while the correspond block is focused. Day, week, month, quarter and year are supported as period. If no period is specified, the default unit is the day. '15' calculate the total of the last 15 days. If you want to total of the two last month, you can just write 'two months'. Other examples: "previous week", "2 quarters", etc. Natural language recognition is currently very basic and doesn't recognize given date or date range, significant improvements could be made if requested by users.
+  - `simple total in context (sibbling/children blocks)`: only total is calcultated (without taking into account the categories), only in a subset of the page:
+    -  if the command is executed in a block with children, the calculation will be done on all children and their children,
+    -  otherwise, it will concern the sibbling blocks and their children.
+  - `total for current page and all its references`: if you don't need to include references of the current page, use the previous command. this command browses all linked references of the current page, not only those that directly contain an elapsed time, but also those that could contain it in their children (experimental, may not be always accurate).
 
 For any of these commands, 
   - if the cursor is in a block without children, total and total by categories will be inserted here
   - if the cursor is in a block with children, total and total by categories will be inserted as the last children, and a block reference to the total will be inserted in the current block
   - if no block is selected, the total will be inserted as the last block of the page
-
 
 - **Categories and sub-categories**: you can define a list of categories, used as trigger words for elapsed time calculation of an interval and for more details in the total calculation. Just write them in plain text **or mention them as block reference** (so you can easily find the right category with block search) in a block where you want to measure the elapsed time on the correspoding task.
   - Each category can be subdivided in sub-categories (e.g. 'reading', subdivided in 'article' and 'book'). If a sub-categorie is mentionned in the current block, the time will also be added to the parent categorie in total calculation, and sub-categories can be dispayed or not in the total calculation.
