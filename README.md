@@ -26,7 +26,9 @@ Calculate and insert elapsed time between two timestamp. The `Elapsed time` comm
 Another way to insert easily timestamps and run this command is to use SmartBlocks command. For instructions, see 'SmartBlocks commands' section below.
 
 ### Total time
-Total is calculated as the sum of elapsed times (formated by Time tracker, not only double timestamps) and pomodoros. It is displayed in a customizable format (category: **30'**) and in a basic outline of blocks by default, but cat also be displayed in Roam {{table}} and is copied in the clipboard in a simple text format.
+Total is calculated as the sum of elapsed times (⚠️ formated by Time tracker, double timestamps without calculated elapsed time are not taken into account!) and pomodoros (if no elapsed time in the block, and whether or not they have been completed).
+
+It is displayed in a customizable format (category: **30'**) and in a basic outline of blocks by default, but cat also be displayed in Roam {{table}} and is copied in the clipboard in a simple text format. A development envisaged for a later version is to propose a dynamic table and a graphic visualization of the data.
 
 Total can be calculated in different range of data or periods, depending on the command used:
   - `total in the entire page, by categories`: total and subtotals are calculated by category. An elapsed time is added to one or more categories if they are in the same block or if a category (provided it is a reference page) is in a parent block (see "Categories, goals and limits configuration" for more information).
@@ -35,7 +37,7 @@ Total can be calculated in different range of data or periods, depending on the 
   - `simple total in context (sibbling/children blocks)`: only total is calcultated (without taking into account the categories), only in a subset of the page:
     -  if the command is executed in a block with children, the calculation will be done on all children and their children,
     -  otherwise, it will concern the sibbling blocks and their children.
-  - `total for current page and all its references`: if you don't need to include references of the current page, use the previous command. this command browses all linked references of the current page, not only those that directly contain an elapsed time, but also those that could contain it in their children (experimental, may not be always accurate).
+  - `total for current page and all its references`: if you don't need to include references of the current page, use the previous command. This command browses all linked references of the current page, not only those that directly contain an elapsed time, but also those that could contain it in their children (experimental, may not be always accurate).
 
 For any of these commands, 
   - if the cursor is in a block without children, total and total by categories will be inserted here
@@ -44,11 +46,11 @@ For any of these commands,
 
 ## Categories, goals and limits configuration: 
 
-If categories, and Goals & Limits blocks are not already defined, run `Time Tracker: Set categories list, goals & limits` to configure your categories. It will open `[[roam/depot/time tracker]]` in the sidebar and insert a template to help you to enter your own categories. You can define manually block reference for categories list, or goals & limits list. Once its defined, all change in the corresping blocks and children blocks will automatically be taken into account. No more refresh or SmartBlock button is needed (corresponding SmartBlocks command are deprecated).
+If categories, and Goals & Limits blocks are not already defined, run `Time Tracker: Set categories list, goals & limits` to configure your categories. It will open `[[roam/depot/time tracker]]` in the sidebar and insert a template to help you to enter your own categories. You can paste manually the block reference of your categories list, or goals & limits list. Once its defined, all change in the corresping blocks and children blocks will automatically be taken into account. No more refresh or SmartBlock button is needed (corresponding SmartBlocks command are deprecated).
 
 ### Categories and sub-categories
-  - You can define a list of categories, used as trigger words for elapsed time calculation of an interval and for more details in the total calculation. A category can consist in any string of characters (case unsensitive), in page reference or block reference. To mention a category, just write it in plain text or mention them as block reference (so you can easily find the right category with block search) in a block where you want to measure the elapsed time on the correspoding task. If the category is a `[[page reference]]`, it will be applied to all elapsed times in the children blocks (unless anoter category is specified).
-  - Each category can be subdivided in sub-categories (e.g. 'reading', subdivided in 'article' and 'book'), and so forth. If a sub-category is mentionned in a block, the time will also be added to the parent categorie in total calculation. Two subcategories of two different categories can have the same name, in this case you will have to specify both the category and the subcategory in order to refer to it properly
+  - You can define a list of categories, used as trigger words for elapsed time calculation of an interval and for more details in the total calculation. A category can consist in any string of characters (case unsensitive), in page reference or block reference. To mention a category, just write it in plain text or mention it as block reference (so you can easily find the right category with block search) in a block where you want to measure the elapsed time on the correspoding task. If the category is a `[[page reference]]`, it will be applied to all elapsed times in the children blocks (unless anoter category is specified).
+  - Each category can be subdivided in sub-categories (e.g. 'reading', subdivided in 'article' and 'book'), and so forth. If a sub-category is mentionned in a block, the time will also be added to the parent category in total calculation. Two subcategories of two different categories can have the same name, in this case you will have to specify both the category and the subcategory in order to refer to it properly
   - You can mention multiple categories in the same block, time will be added in all of them.
 
 ### Goals and limits
