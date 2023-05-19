@@ -1,6 +1,9 @@
-# Elapsed Time Calculator
+# Time Tracker (formerly Elapsed Time Calculator)
 
-Easily **track the time spent on your activities and calculate the total daily time spent on them**, organized by categories and sub-categories, and see if predefined **limits or goals** are respected. Helps to implement **interstitial journaling**.
+v.2 introduce a lot of new features, see [changelog here](https://github.com/fbgallet/roam-extension-elapsed-time/blob/main/CHANGELOG.md)
+
+Easily **track the time spent on your activities and calculate the total time spent on them**, organized by categories and sub-categories (and so on), and see if predefined **limits or goals** are respected. Helps to implement **interstitial journaling**.
+Review total by day, week, month, quarter, year, or any given period of time.
 
 ![Elapsed time demo](https://user-images.githubusercontent.com/74436347/184550335-ac5acde2-c9f9-459b-8e30-ec239abd7041.gif)
 
@@ -9,9 +12,12 @@ Easily **track the time spent on your activities and calculate the total daily t
 
 ## Features and instructions
 
-- **Elapsed time from now**: place your cursor anywhere in a block containing a timestamp and run `Elapsed time` from the command palette (Ctr/Cmd + P). Timestamp from nom and elapsed time until now, in minutes, will be automatically inserted after the first timestamp.
+All commands in command palette (Ctrl/Cmd + p) begin with "Time tracker: " and you can set custom hotkeys for each of them.
 
-- **Elapsed time between two timestamps**: place your cursor anywhere in a block with two timestamps separeted by `-` (default, see above for user settings) and run `Elapsed time`: the number of minutes between the two timestamps will be inserted after them. Or just click on a SmartBlock button, see below for configuration.
+- **Elapsed time**: place your cursor anywhere in a block:
+  - if it contains a timestamp, a second timestamp (now) will be added and the elapsped time calculated,
+  - if it contains already two timestamps, the elapsed time will be (re)calculated,
+  - if there is no timestamp (or a Smartblock button for a timestamp), the now timestamp will be inserted,
 
 - **Total time**: place your cursor in a sibbling block or direct parent block of a set of blocks containing an elapsed time (calculated with the command mentioned above) and run `Total time` from the command palette. Total time spent will be inserted and, if categories have been specified, total per catetogies & sub-categories.
 
