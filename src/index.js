@@ -93,6 +93,11 @@ class Category {
     this.limit.type = type;
     this.limit[interval] = time;
   }
+  resetLimit() {
+    this.limit.type = "undefined";
+    this.limit.task = 0;
+    this.limit.day = 0;
+  }
   addTime(time) {
     this.time += time;
     if (this.parent) this.parent.addTime(time);
@@ -172,10 +177,10 @@ export function scanCategories(s, refs, callBack, once) {
   return result;
 }
 
-function getCategories(parentUid) {
+export function getCategories(parentUid) {
   categoriesArray.length = 0;
   categoriesNames.length = 0;
-  let triggerTree = getChildrenTree(parentUid);
+  let triggerTree = parentUid ? getChildrenTree(parentUid) : null;
 
   if (triggerTree) {
     for (let i = 0; i < triggerTree.length; i++) {
@@ -193,9 +198,13 @@ function getCategories(parentUid) {
     }
     categoriesNames = categoriesArray.map((trigger) => trigger.name);
     categoriesRegex = getRegexFromArray(categoriesNames);
+  } else {
+    categoriesArray.length = 0;
+    categoriesNames.length = 0;
+    categoriesRegex = null;
   }
-  console.log(categoriesArray);
-  console.log(categoriesNames);
+  //console.log(categoriesArray);
+  //console.log(categoriesNames);
 
   function getSubCategories(tree, topTrigger, hideTop) {
     for (let j = 0; j < tree.length; j++) {
@@ -219,8 +228,8 @@ function getCategories(parentUid) {
   }
 }
 
-function getLimits(uid) {
-  let tree = getChildrenTree(uid);
+export function getLimits(uid) {
+  let tree = uid ? getChildrenTree(uid) : null;
   if (tree) {
     tree.forEach((limitType) => {
       if (limitType.string.toLowerCase().includes("goal")) {
@@ -229,7 +238,11 @@ function getLimits(uid) {
         getLimitsInterval("limit", limitType.children);
       }
     });
-  }
+  } else resetLimits();
+}
+
+function resetLimits() {
+  categoriesArray.forEach((cat) => cat.resetLimit());
 }
 
 function getLimitsInterval(type, tree) {
@@ -323,7 +336,6 @@ function setDurationRegex() {
       splittedDurationFormat[1]
     )}`
   );
-  console.log(durationRegex);
 }
 
 function registerPaletteCommands(extensionAPI) {
@@ -335,7 +347,7 @@ function registerPaletteCommands(extensionAPI) {
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Time Tracker: Total in the entire page, by categories",
+    label: "Time Tracker: Total for current day or page",
     callback: async () => {
       let startUid = await getCurrentBlockUidOrCreateIt();
       setTimeout(() => {
@@ -539,7 +551,7 @@ const panelConfig = {
         type: "input",
         onChange: (evt) => {
           categoriesUID = correctUidInput(evt.target.value);
-          if (categoriesUID != null) getCategories(categoriesUID);
+          getCategories(categoriesUID);
         },
       },
     },

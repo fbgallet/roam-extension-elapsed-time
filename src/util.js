@@ -200,7 +200,7 @@ export function addPullWatch(uid, callback) {
     "[:block/children :block/string {:block/children ...}]",
     `[:block/uid "${uid}"]`,
     function a(before, after) {
-      console.log("after", after);
+      //console.log("after", after);
       callback(uid);
     }
   );

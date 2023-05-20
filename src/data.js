@@ -1,3 +1,4 @@
+import { getCategories, getLimits } from ".";
 import {
   addChildrenBlocks,
   addPullWatch,
@@ -54,7 +55,7 @@ export async function createCategoriesBlock(parentUid, extensionAPI) {
   createBlock(exA, "Article");
   createBlock(titleUid, "Write");
   addPullWatch(titleUid, getCategories);
-  extensionAPI.settings.set("categoriesSetting", categoriesUID);
+  extensionAPI.settings.set("categoriesSetting", titleUid);
   return titleUid;
 }
 export async function createLimitsBlock(parentUid, extensionAPI) {
@@ -79,7 +80,7 @@ export async function createLimitsBlock(parentUid, extensionAPI) {
   addIntervalByPeriod(goalUid);
   addIntervalByPeriod(limitUid);
   addPullWatch(titleUid, getLimits);
-  extensionAPI.settings.set("limitsSetting", limitsUID);
+  extensionAPI.settings.set("limitsSetting", titleUid);
   return titleUid;
 
   async function addIntervalByPeriod(uid) {

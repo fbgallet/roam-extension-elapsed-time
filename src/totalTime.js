@@ -29,6 +29,7 @@ import {
   getYesterdayDate,
   simpleCreateBlock,
   simulateClick,
+  sumOfArrayElements,
 } from "./util";
 
 const pomodoroRegex = /\{\{\[?\[?POMO\]?\]?: ?([0-9]*)\}\}/;
@@ -66,7 +67,7 @@ export async function totalTime(currentUID, scopeUid, byCategories = true) {
   //console.log("scope:", scopeUid);
   if (byCategories) {
     blockTree = getChildrenTree(scopeUid);
-    await directChildrenProcess(blockTree);
+    total = await directChildrenProcess(blockTree);
   } else total = getTotalTimeInTree(blockTree);
   let totalOutput = getTotalTimeOutput(total);
   let totalUid = prepareTotalTimeInsersion(
@@ -345,14 +346,20 @@ export async function getTotalTimeFromPreviousDays(
   dnpUidArray = await getPreviousDailyLogs(today, period);
   //console.log(dnpUidArray);
   let total = 0;
-  let dailyLogs = new DailyLog();
-  dnpUidArray.forEach((day) => {
-    let dayLog = new DayLog(day);
-    total += getTotaTimeInDailyLog(dayLog);
-    dailyLogs.addDay(dayLog);
-  });
+  total = await sumDailyLogs(dnpUidArray);
   //  console.log(categoriesArray);
   return total;
+}
+
+async function sumDailyLogs(dnpUidArray) {
+  let total = [];
+  await Promise.all(
+    dnpUidArray.map(async (day) => {
+      let dayLog = new DayLog(day);
+      total.push(await getTotaTimeInDailyLog(dayLog));
+    })
+  );
+  return sumOfArrayElements(total);
 }
 
 export function displayTotalByPeriod(uid, total, period) {
@@ -407,22 +414,11 @@ async function getPreviousDailyLogs(today, period) {
   return dnpUidArray;
 }
 
-export function getTotaTimeInDailyLog(dayLog) {
-  // let daylog = new DayLog(day);
+export async function getTotaTimeInDailyLog(dayLog) {
   let dayTree = getChildrenTree(dayLog.day);
   if (!dayTree) return 0;
-  // else dayTree.flat(Infinity);
-  console.log(dayTree);
-  directChildrenProcess(dayTree);
-  //console.log("Etat pour le " + dayLog.day);
-  //console.log(categoriesArray);
-  return 0;
-  // let stringified = JSON.stringify(dayTree); //.split('"string":"');
-  // if (dayLog.target && !stringified.includes(dayLog.target)) return 0;
-  // if (extractElapsedTime(stringified)) {
-  //   let total = getTimesFromArray(stringified.split('"string":"'), dayLog);
-  //   return total;
-  // } else return 0;
+  let total = await directChildrenProcess(dayTree);
+  return total;
 }
 
 /*========================================================================*/
@@ -558,6 +554,8 @@ function getTotalTimeOutput(total, period = null) {
 
   let totalToBeCalculated = false;
   let displayTotal;
+  console.log(total);
+  console.log(period);
   if (total != 0) displayTotal = formatDisplayTime({ time: total }, period, "");
   else totalToBeCalculated = true;
   let totalOutput = new Output(displayTotal);
@@ -645,12 +643,12 @@ function insertTotalTimeByCategory(uid, output, isSub = false) {
         insertTotalTimeByCategory(catUid, output.children[i], true);
     }
   }
-  if (uncategorized != 0 && !isSub && output.children.length != 0) {
-    window.roamAlphaAPI.createBlock({
-      location: { "parent-uid": uid, order: output.children.length },
-      block: { string: formatDisplayTime(null, "__Uncategorized__", "") },
-    });
-  }
+  // if (uncategorized != 0 && !isSub && output.children.length != 0) {
+  //   window.roamAlphaAPI.createBlock({
+  //     location: { "parent-uid": uid, order: output.children.length },
+  //     block: { string: formatDisplayTime(null, "__Uncategorized__", "") },
+  //   });
+  // }
   return;
 }
 
@@ -671,7 +669,7 @@ function insertTableOfTotalByCategory(
   order = "last"
 ) {
   if (order == 0) {
-    console.log(output.time);
+    //console.log(output.time);
     let tableComponent = output.time == 0 ? "" : "\n{{table}}";
     window.roamAlphaAPI.updateBlock({
       block: {
