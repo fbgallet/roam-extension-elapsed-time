@@ -1,4 +1,5 @@
 import { getCategories, getLimits } from ".";
+import { simpleIziMessage } from "./elapsedTime";
 import {
   addChildrenBlocks,
   addPullWatch,
@@ -13,9 +14,17 @@ export async function createSettingsPage(extensionAPI) {
     window.roamAlphaAPI.createPage({
       page: { title: "roam/depot/time tracker", uid: pageUid },
     });
-  } else {
+  } else if (pageUid.children) {
     //TODO
     // récupérer les uids pertinents
+    simpleIziMessage(
+      "[[roam/depot/time tracker]] has aleready some content. If not defined, set block references to categories list and goals&limits list manually, in extension settings. Or delete the page to generate the config template again.",
+      "red"
+    );
+    window.roamAlphaAPI.ui.rightSidebar.addWindow({
+      window: { type: "block", "block-uid": pageUid },
+    });
+    return null;
   }
   let helpUid = await createBlock(
     pageUid,
@@ -36,9 +45,6 @@ export async function createSettingsPage(extensionAPI) {
 
   window.roamAlphaAPI.ui.rightSidebar.addWindow({
     window: { type: "block", "block-uid": pageUid },
-  });
-  extensionAPI.ui.commandPalette.removeCommand({
-    label: "Elapsed time: Set categories list, goals & limits",
   });
   return pageUid;
 }
@@ -85,7 +91,7 @@ export async function createLimitsBlock(parentUid, extensionAPI) {
 
   async function addIntervalByPeriod(uid) {
     let periodsUid = await addChildrenBlocks(uid, ["/interval", "/day"], true);
-    console.log(periodsUid);
+    //console.log(periodsUid);
     if (periodsUid)
       periodsUid.forEach((period) =>
         addChildrenBlocks(period, ["15'", "30'", "45'", "60'"])

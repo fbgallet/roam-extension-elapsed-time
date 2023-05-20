@@ -217,6 +217,7 @@ export function removePullWatch(uid, callback) {
 }
 
 export function normalizeUID(uid) {
+  if (!uid) return undefined;
   if (uid.length == 9) return uid;
   if (uid.length == 13 && uid.includes("((") && uid.includes("))"))
     return uid.slice(2, -2);

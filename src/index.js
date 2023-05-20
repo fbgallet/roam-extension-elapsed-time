@@ -4,7 +4,7 @@ import {
   createLimitsBlock,
   createSettingsPage,
 } from "./data";
-import { elapsedTime } from "./elapsedTime";
+import { elapsedTime, simpleIziMessage } from "./elapsedTime";
 import {
   getTotalTimeForCurrentPage,
   totalTime,
@@ -418,43 +418,66 @@ function registerPaletteCommands(extensionAPI) {
   // });
 
   if (getBlockAttributes(categoriesUID)) {
-    addOpenCategoriesCommand(extensionAPI);
+    addOpenCategoriesAndLimitsCommands(extensionAPI);
   } else {
-    extensionAPI.ui.commandPalette.addCommand({
-      label: "Time Tracker: Set categories list, goals & limits",
-      callback: async () => {
-        let pageUid = await createSettingsPage(extensionAPI);
-        await createCategoriesBlock(pageUid, extensionAPI);
-        await createLimitsBlock(pageUid, extensionAPI);
-        addOpenCategoriesCommand(extensionAPI);
-        addOpenLimitsCommand(extensionAPI);
-      },
-    });
-  }
-  if (limitsUID) {
-    addOpenLimitsCommand(extensionAPI);
+    addOpenSettingsCommand(extensionAPI);
   }
 }
 
-function addOpenCategoriesCommand(extensionAPI) {
+function addOpenSettingsCommand(extensionAPI) {
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Time Tracker: Set categories list, goals & limits",
+    callback: async () => {
+      if (normalizeUID(categoriesUID) || normalizeUID(limitsUID)) {
+        simpleIziMessage(
+          "Categories block reference and/or Goals&Limits block reference are already defined, open extension settings to change them.",
+          "red"
+        );
+        return;
+      }
+      let pageUid = await createSettingsPage(extensionAPI);
+      if (!pageUid) return;
+      categoriesUID = await createCategoriesBlock(pageUid, extensionAPI);
+      limitsUID = await createLimitsBlock(pageUid, extensionAPI);
+      addOpenCategoriesAndLimitsCommands(extensionAPI);
+    },
+  });
+}
+
+function addOpenCategoriesAndLimitsCommands(
+  extensionAPI,
+  catUid = categoriesUID,
+  limitUid = limitsUID
+) {
+  updateOpenCategoriesCommand(extensionAPI, catUid);
+  updateOpenLimitsCommand(extensionAPI, limitUid);
+  removeOpenSettingsCommand(extensionAPI);
+}
+
+function updateOpenCategoriesCommand(extensionAPI, catUid = categoriesUID) {
   extensionAPI.ui.commandPalette.addCommand({
     label: "Time Tracker: Open categories list in sidebar",
     callback: async () => {
       window.roamAlphaAPI.ui.rightSidebar.addWindow({
-        window: { type: "block", "block-uid": categoriesUID },
+        window: { type: "block", "block-uid": catUid },
+      });
+    },
+  });
+}
+function updateOpenLimitsCommand(extensionAPI, limitsUid = limitsUID) {
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Time Tracker: Open goals & limits in sidebar",
+    callback: async () => {
+      window.roamAlphaAPI.ui.rightSidebar.addWindow({
+        window: { type: "block", "block-uid": limitsUid },
       });
     },
   });
 }
 
-function addOpenLimitsCommand(extensionAPI) {
-  extensionAPI.ui.commandPalette.addCommand({
-    label: "Time Tracker: Open goals & limits in sidebar",
-    callback: async () => {
-      window.roamAlphaAPI.ui.rightSidebar.addWindow({
-        window: { type: "block", "block-uid": limitsUID },
-      });
-    },
+function removeOpenSettingsCommand(extensionAPI) {
+  extensionAPI.ui.commandPalette.removeCommand({
+    label: "Time Tracker: Set categories list, goals & limits",
   });
 }
 
@@ -529,227 +552,241 @@ function registerSmartblocksCommands(extensionAPI) {
 }
 
 function correctUidInput(uid) {
-  if (uid.length != 9 || uid.length == 13) {
+  if (uid.length == 9 || uid.length == 13) {
     return normalizeUID(uid);
   } else {
-    console.log(
-      "CategoriesUID has to be a valid block reference, with or without brackets."
+    simpleIziMessage(
+      "Categories or Goals & Limits reference has to be a valid block reference, with or without brackets.",
+      "red"
     );
     return null;
   }
 }
 
-const panelConfig = {
-  tabTitle: "Time Tracker",
-  settings: [
-    {
-      id: "categoriesSetting",
-      name: "Categories",
-      description:
-        "Parent block reference where your categories and subcategories are listed:",
-      action: {
-        type: "input",
-        onChange: (evt) => {
-          categoriesUID = correctUidInput(evt.target.value);
-          getCategories(categoriesUID);
-        },
-      },
-    },
-    {
-      id: "limitsSetting",
-      name: "Goals and Limits",
-      description:
-        "Parent block reference where your goals and limits are set:",
-      action: {
-        type: "input",
-        onChange: (evt) => {
-          limitsUID = correctUidInput(evt.target.value);
-          if (limitsUID != null) getLimits(limitsUID);
-        },
-      },
-    },
-    {
-      id: "flagsDropdown",
-      name: "Predefined Flags",
-      description:
-        "Choose a set of predefined flags or choose 'Customized' and fill the input filed below:",
-      action: {
-        type: "select",
-        items: ["🎯,⚠️,👍,🛑", "Color block tags (green/red)", "Customized"],
-        onChange: (evt) => {
-          if (evt == "Color block tags (green/red)")
-            limitFlag = getLimitFlags("Tags");
-          else {
-            if (evt == "🎯,⚠️,👍,🛑") limitFlag = getLimitFlags("Icons");
-            else limitFlag = getLimitFlags("Customized", customFlags);
-          }
-        },
-      },
-    },
-    {
-      id: "flagsSetting",
-      name: "Customized Flags",
-      description:
-        "Set flags to insert, separated by a comma: goal reached or not, (and optionally) limit respected or exceeded:",
-      action: {
-        type: "input",
-        placeholder: "goal-success,goal-fail [,limit-success,limit-fail]",
-        onChange: (evt) => {
-          customFlags = evt.target.value;
-          if (customFlags.includes(","))
-            limitFlag = getLimitFlags("Customized", customFlags);
-          else {
-            limitFlag = limitFlagDefault;
-          }
-        },
-      },
-    },
-    {
-      id: "displayTotalSetting",
-      name: "Display total mode",
-      description:
-        "Display inline total as blocks outline or as Roam {{table}}",
-      action: {
-        type: "select",
-        items: ["blocks", "table"],
-        onChange: (sel) => {
-          sel === "blocks"
-            ? (displayTotalAsTable = false)
-            : (displayTotalAsTable = true);
-        },
-      },
-    },
-    {
-      id: "displaySetting",
-      name: "Display subcategories",
-      description: "Display subcategories in Total time per day",
-      action: {
-        type: "switch",
-        onChange: () => {
-          displaySubCat = !displaySubCat;
-        },
-      },
-    },
-    {
-      id: "popupSetting",
-      name: "Display confirmation popup",
-      description:
-        "Ask for confirmation before applying a flag to the current block (automatic if disable):",
-      action: {
-        type: "switch",
-        onChange: () => {
-          confirmPopup = !confirmPopup;
-        },
-      },
-    },
-    {
-      id: "defaultTimeSetting",
-      name: "Default alert time",
-      description:
-        "Time limit (in minutes) beyond which an alert & confirmation popup (if enabled) will appear if no limit is defined for the block (default: 90)",
-      action: {
-        type: "input",
-        placeholder: "90",
-        onChange: (evt) => {
-          if (!isNaN(evt.target.value))
-            defaultTimeLimit = parseInt(evt.target.value);
-        },
-      },
-    },
-    {
-      id: "intervalSetting",
-      name: "Interval separator",
-      description:
-        "Characters to insert between two timestamps to specify an interval (don't forget the spaces if required):",
-      action: {
-        type: "input",
-        onChange: (evt) => {
-          intervalSeparator = evt.target.value;
-        },
-      },
-    },
-    {
-      id: "durationSetting",
-      name: "Elapsed time format for an interval",
-      description:
-        "Format to emphasize the elapsed time, <d> being the required placeholder for the elapsed time value:",
-      action: {
-        type: "input",
-        onChange: (evt) => {
-          if (evt.target.value.includes("<d>"))
-            durationFormat = evt.target.value;
-          splittedDurationFormat = getStringsAroundPlaceHolder(
-            durationFormat,
-            "<d>"
-          );
-          setDurationRegex();
-        },
-      },
-    },
-    {
-      id: "totalTitleSetting",
-      name: "Total parent block format",
-      description:
-        "Format of the 'Total time' parent block, use <th> (time in hour) or <tm> (time in minutes) placeholder:",
-      action: {
-        type: "input",
-        onChange: (evt) => {
-          if (evt.target.value.includes("<th>")) totalTitle = evt.target.value;
-        },
-      },
-    },
-    {
-      id: "totalCatSetting",
-      name: "Total per category format",
-      description:
-        "Format of each category's 'Total time'. Placeholders: <th> or <tm> for total time, <category> and <limit> for limit format defined below:",
-      action: {
-        type: "input",
-        onChange: (evt) => {
-          if (
-            evt.target.value.includes("<th>") &&
-            evt.target.value.includes("<category>")
-          )
-            totalFormat = evt.target.value;
-        },
-      },
-    },
-    {
-      id: "limitFormatSetting",
-      name: "Limit per category format",
-      description:
-        "Format of the limit display for each category. Placeholders: <flag> for limit flag, <type> for 'Goal' or 'Limit', <value> for predefined limit value:",
-      action: {
-        type: "input",
-        onChange: (evt) => {
-          limitFormat = evt.target.value;
-        },
-      },
-    },
-    {
-      id: "autoCopyToClipboard",
-      name: "Copy total to clipboard",
-      description:
-        "Automatically copy simple total time table to clipboard when displaying total:",
-      action: {
-        type: "switch",
-        onChange: (evt) => {
-          autoCopyTotalToClipboard = !autoCopyTotalToClipboard;
-        },
-      },
-    },
-  ],
-};
-
 export default {
   onload: ({ extensionAPI }) => {
+    const panelConfig = {
+      tabTitle: "Time Tracker",
+      settings: [
+        {
+          id: "categoriesSetting",
+          name: "Categories",
+          description:
+            "Parent block reference where your categories and subcategories are listed:",
+          action: {
+            type: "input",
+            onChange: (evt) => {
+              categoriesUID = correctUidInput(evt.target.value);
+              if (!categoriesUID) addOpenSettingsCommand(extensionAPI);
+              else addOpenCategoriesAndLimitsCommands(extensionAPI);
+              getCategories(categoriesUID);
+            },
+          },
+        },
+        {
+          id: "limitsSetting",
+          name: "Goals and Limits",
+          description:
+            "Parent block reference where your goals and limits are set:",
+          action: {
+            type: "input",
+            onChange: (evt) => {
+              limitsUID = correctUidInput(evt.target.value);
+              if (limitsUID != null)
+                addOpenCategoriesAndLimitsCommands(extensionAPI);
+              if (!limitsUID && !categoriesUID)
+                addOpenSettingsCommand(extensionAPI);
+              getLimits(limitsUID);
+            },
+          },
+        },
+        {
+          id: "flagsDropdown",
+          name: "Predefined Flags",
+          description:
+            "Choose a set of predefined flags or choose 'Customized' and fill the input filed below:",
+          action: {
+            type: "select",
+            items: [
+              "🎯,⚠️,👍,🛑",
+              "Color block tags (green/red)",
+              "Customized",
+            ],
+            onChange: (evt) => {
+              if (evt == "Color block tags (green/red)")
+                limitFlag = getLimitFlags("Tags");
+              else {
+                if (evt == "🎯,⚠️,👍,🛑") limitFlag = getLimitFlags("Icons");
+                else limitFlag = getLimitFlags("Customized", customFlags);
+              }
+            },
+          },
+        },
+        {
+          id: "flagsSetting",
+          name: "Customized Flags",
+          description:
+            "Set flags to insert, separated by a comma: goal reached or not, (and optionally) limit respected or exceeded:",
+          action: {
+            type: "input",
+            placeholder: "goal-success,goal-fail [,limit-success,limit-fail]",
+            onChange: (evt) => {
+              customFlags = evt.target.value;
+              if (customFlags.includes(","))
+                limitFlag = getLimitFlags("Customized", customFlags);
+              else {
+                limitFlag = limitFlagDefault;
+              }
+            },
+          },
+        },
+        {
+          id: "displayTotalSetting",
+          name: "Display total mode",
+          description:
+            "Display inline total as blocks outline or as Roam {{table}}",
+          action: {
+            type: "select",
+            items: ["blocks", "table"],
+            onChange: (sel) => {
+              sel === "blocks"
+                ? (displayTotalAsTable = false)
+                : (displayTotalAsTable = true);
+            },
+          },
+        },
+        {
+          id: "displaySetting",
+          name: "Display subcategories",
+          description: "Display subcategories in Total time per day",
+          action: {
+            type: "switch",
+            onChange: () => {
+              displaySubCat = !displaySubCat;
+            },
+          },
+        },
+        {
+          id: "popupSetting",
+          name: "Display confirmation popup",
+          description:
+            "Ask for confirmation before applying a flag to the current block (automatic if disable):",
+          action: {
+            type: "switch",
+            onChange: () => {
+              confirmPopup = !confirmPopup;
+            },
+          },
+        },
+        {
+          id: "defaultTimeSetting",
+          name: "Default alert time",
+          description:
+            "Time limit (in minutes) beyond which an alert & confirmation popup (if enabled) will appear if no limit is defined for the block (default: 90)",
+          action: {
+            type: "input",
+            placeholder: "90",
+            onChange: (evt) => {
+              if (!isNaN(evt.target.value))
+                defaultTimeLimit = parseInt(evt.target.value);
+            },
+          },
+        },
+        {
+          id: "intervalSetting",
+          name: "Interval separator",
+          description:
+            "Characters to insert between two timestamps to specify an interval (don't forget the spaces if required):",
+          action: {
+            type: "input",
+            onChange: (evt) => {
+              intervalSeparator = evt.target.value;
+            },
+          },
+        },
+        {
+          id: "durationSetting",
+          name: "Elapsed time format for an interval",
+          description:
+            "Format to emphasize the elapsed time, <d> being the required placeholder for the elapsed time value:",
+          action: {
+            type: "input",
+            onChange: (evt) => {
+              if (evt.target.value.includes("<d>"))
+                durationFormat = evt.target.value;
+              splittedDurationFormat = getStringsAroundPlaceHolder(
+                durationFormat,
+                "<d>"
+              );
+              setDurationRegex();
+            },
+          },
+        },
+        {
+          id: "totalTitleSetting",
+          name: "Total parent block format",
+          description:
+            "Format of the 'Total time' parent block, use <th> (time in hour) or <tm> (time in minutes) placeholder:",
+          action: {
+            type: "input",
+            onChange: (evt) => {
+              if (evt.target.value.includes("<th>"))
+                totalTitle = evt.target.value;
+            },
+          },
+        },
+        {
+          id: "totalCatSetting",
+          name: "Total per category format",
+          description:
+            "Format of each category's 'Total time'. Placeholders: <th> or <tm> for total time, <category> and <limit> for limit format defined below:",
+          action: {
+            type: "input",
+            onChange: (evt) => {
+              if (
+                evt.target.value.includes("<th>") &&
+                evt.target.value.includes("<category>")
+              )
+                totalFormat = evt.target.value;
+            },
+          },
+        },
+        {
+          id: "limitFormatSetting",
+          name: "Limit per category format",
+          description:
+            "Format of the limit display for each category. Placeholders: <flag> for limit flag, <type> for 'Goal' or 'Limit', <value> for predefined limit value:",
+          action: {
+            type: "input",
+            onChange: (evt) => {
+              limitFormat = evt.target.value;
+            },
+          },
+        },
+        {
+          id: "autoCopyToClipboard",
+          name: "Copy total to clipboard",
+          description:
+            "Automatically copy simple total time table to clipboard when displaying total:",
+          action: {
+            type: "switch",
+            onChange: (evt) => {
+              autoCopyTotalToClipboard = !autoCopyTotalToClipboard;
+            },
+          },
+        },
+      ],
+    };
+
     extensionAPI.settings.panel.create(panelConfig);
-    categoriesUID = extensionAPI.settings.get("categoriesSetting");
+    categoriesUID = normalizeUID(
+      extensionAPI.settings.get("categoriesSetting")
+    );
     if (categoriesUID)
       getBlockAttributes(categoriesUID)
         ? addPullWatch(categoriesUID, getCategories)
         : extensionAPI.settings.set("categoriesSetting", undefined);
-    limitsUID = extensionAPI.settings.get("limitsSetting");
+    limitsUID = normalizeUID(extensionAPI.settings.get("limitsSetting"));
     if (limitsUID)
       getBlockAttributes(limitsUID)
         ? addPullWatch(limitsUID, getLimits)

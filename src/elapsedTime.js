@@ -314,12 +314,14 @@ function extractLimit(s, shift) {
   return t;
 }
 
-export function simpleIziMessage(message) {
+export function simpleIziMessage(message, color = "blue") {
   iziToast.info({
-    timeout: 5000,
+    timeout: 8000,
     displayMode: "replace",
     id: "timing",
     zindex: 999,
+    color: color,
+    maxWidth: "800px",
     // title: textTitle,
     message: message,
     position: "bottomCenter",

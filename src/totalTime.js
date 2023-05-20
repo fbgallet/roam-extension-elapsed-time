@@ -703,6 +703,8 @@ function copyTotalToClipboard() {
   if (autoCopyTotalToClipboard) {
     getListOfTotalByCategory(categoriesArray.filter((cat) => !cat.parent));
     navigator.clipboard.writeText(outputForClipboard);
-    simpleIziMessage("Total times copied to clipboard in a simple table");
+    simpleIziMessage(
+      "Total times copied to clipboard in a simple table, easy to export."
+    );
   }
 }
