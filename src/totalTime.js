@@ -136,8 +136,10 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
       } else {
         //  time = parseInt(time);
         if (triggeredCat) triggeredCat.forEach((cat) => cat.addTime(time));
-        else if (parentBlockCat) parentBlockCat.addTime(time);
-        else uncategorized += time;
+        else {
+          if (parentBlockCat) parentBlockCat.addTime(time);
+          else uncategorized += time;
+        }
         processChildren = false;
         total += parseInt(time);
       }
@@ -165,13 +167,14 @@ function getTriggeredCategoriesFromNames(names, parentBlockCat) {
   if (names.length > 0) {
     let catAndPossiblesCat = [].concat(
       ...names.map((name) => {
-        let possibleCategories = categoriesArray.filter(
-          (cat) => cat.name === name
+        let possibleCategories = categoriesArray.filter((cat) =>
+          cat.type === "text"
+            ? cat.name.toLowerCase() === name.toLowerCase()
+            : cat.name === name
         );
         if (possibleCategories) return possibleCategories;
       })
     );
-    //console.log(catAndPossiblesCat);
     if (catAndPossiblesCat) {
       result = result.concat(getTriggeredCategories(catAndPossiblesCat));
       // console.log("Block result:");
@@ -553,7 +556,7 @@ function getTotalTimeOutput(total, period = null) {
   } else if (period && !isNaN(period))
     period = "period: since " + period + " days:";
   else period = "";
-
+  console.log(categoriesArray);
   let totalToBeCalculated = false;
   let displayTotal;
   //console.log(total);
