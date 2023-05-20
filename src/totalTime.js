@@ -9,6 +9,7 @@ import {
   categoriesArray,
   autoCopyTotalToClipboard,
   displayTotalAsTable,
+  includePomodoros,
 } from ".";
 import { simpleIziMessage } from "./elapsedTime";
 import {
@@ -109,12 +110,12 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
       let blockContent = tree[i].string;
       //console.log(blockContent);
       let time = extractElapsedTime(blockContent);
-      let pomo = extractPomodoro(blockContent);
+      let pomo = includePomodoros ? extractPomodoro(blockContent) : null;
       if (pomo) {
         totalPomo.nb++;
         totalPomo.time += pomo;
       }
-      if (!time) time = pomo ? pomo[1] : null;
+      if (!time) time = pomo ? pomo : null;
       //console.log(categoriesRegex);
       //let matchingWords = [...blockContent.matchAll(categoriesRegex)];
       let matchingWords = blockContent.match(categoriesRegex);
@@ -220,6 +221,7 @@ function addOnlySupCatIfSynonym(cat, lastCatName, catArray) {
 function extractPomodoro(content) {
   let result = content.match(pomodoroRegex);
   if (result) result = result[1];
+  else return null;
   return parseInt(result);
 }
 
@@ -230,7 +232,7 @@ function getTotalTimeInTree(tree, uidToExclude = null) {
     let total = 0;
     stringified.split('"string":"').forEach((string) => {
       let result = extractElapsedTime(string);
-      if (!result) {
+      if (!result && includePomodoros) {
         result = extractPomodoro(string);
       }
       if (
@@ -397,7 +399,7 @@ async function getPreviousDailyLogs(today, period) {
         break;
     }
   } else {
-    console.log(period);
+    //  console.log(period);
     limitedNb = false;
     nbOfDays = period;
   }
@@ -554,7 +556,7 @@ function getTotalTimeOutput(total, period = null) {
 
   let totalToBeCalculated = false;
   let displayTotal;
-  console.log(total);
+  //console.log(total);
   console.log(period);
   if (total != 0) displayTotal = formatDisplayTime({ time: total }, period, "");
   else totalToBeCalculated = true;

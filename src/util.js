@@ -20,7 +20,7 @@ export function getTreeByPageTitle(pageTitle) {
 export function getChildrenTree(uid) {
   if (uid) {
     let result = window.roamAlphaAPI.q(`[:find (pull ?page
-      [:block/uid :block/string :block/children 
+      [:block/uid :block/string :block/children :block/order 
          {:block/children ...} ])
        :where [?page :block/uid "${uid}"]  ]`);
     if (result.length > 0) return result[0][0].children;
@@ -42,6 +42,7 @@ export function getBlockAttributes(uid) {
     return {
       string: result[":block/string"],
       open: result[":block/open"],
+      order: result[":block/order"],
       heading: result[":block/heading"],
       align: result[":block/text-align"],
       view: result[":block/view-type"],
@@ -50,8 +51,10 @@ export function getBlockAttributes(uid) {
 }
 
 export function getBlockContent(uid) {
-  return window.roamAlphaAPI.q(`[:find (pull ?page [:block/string])
-                      :where [?page :block/uid "${uid}"]  ]`)[0][0].string;
+  let result = window.roamAlphaAPI.q(`[:find (pull ?page [:block/string])
+                      :where [?page :block/uid "${uid}"]  ]`);
+  if (result[0][0]) return result[0][0].string;
+  else return null;
   // return window.roamAlphaAPI.pull("[:block/string]", [":block/uid", uid])[
   //   ":block/string"
   // ];

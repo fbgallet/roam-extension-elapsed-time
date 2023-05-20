@@ -3,16 +3,21 @@ import "../node_modules/izitoast/dist/css/iziToast.css";
 import {
   addZero,
   extractDelimitedNumberFromString,
+  getBlockAttributes,
   getBlockContent,
   getBlocksUidReferencedInThisBlock,
+  getChildrenTree,
+  getParentUID,
   updateBlock,
 } from "./util";
 import {
   confirmPopup,
   defaultTimeLimit,
   durationFormat,
+  durationRegex,
   intervalSeparator,
   limitFlag,
+  remoteElapsedTime,
   scanCategories,
 } from ".";
 
@@ -51,29 +56,35 @@ class TimeStamp {
   }
 }
 
-export async function elapsedTime(blockUID) {
+export async function elapsedTime(blockUID, firstLoop = true) {
   let hourTag = "";
   let blockContent = getBlockContent(blockUID);
   blockContent = blockContent.replace(" {{⇥🕞:SmartBlock:Elapsed time}}", "");
   let matchingTT = [...blockContent.matchAll(timestampRegex)];
   if (matchingTT.length == 0) {
-    let now = new Date();
-    let nowTS = new TimeStamp(now.getHours() + ":" + now.getMinutes())
-      .normalizedTT;
-    let matchingButton = blockContent.match(timestampButtonRegex);
-    if (matchingButton) {
-      if (matchingButton[0].includes("Double"))
-        nowTS += " {{⇥🕞:SmartBlock:Elapsed time}}";
-      blockContent = blockContent.replace(matchingButton[0], nowTS);
-    } else blockContent = nowTS + " " + blockContent;
-    let focusedBlock = window.roamAlphaAPI.ui.getFocusedBlock();
-    updateBlock(blockUID, blockContent);
-    setTimeout(() => {
-      window.roamAlphaAPI.ui.setBlockFocusAndSelection({
-        location: focusedBlock,
-      });
-    }, 200);
-    return;
+    let hasTSinParent = false;
+    if (remoteElapsedTime)
+      hasTSinParent = await searchTimestampInParentBlock(blockUID);
+    if (!hasTSinParent && firstLoop) {
+      if (remoteElapsedTime) searchTimestampInPreviousSibbling(blockUID);
+      let now = new Date();
+      let nowTS = new TimeStamp(now.getHours() + ":" + now.getMinutes())
+        .normalizedTT;
+      let matchingButton = blockContent.match(timestampButtonRegex);
+      if (matchingButton) {
+        if (matchingButton[0].includes("Double"))
+          nowTS += " {{⇥🕞:SmartBlock:Elapsed time}}";
+        blockContent = blockContent.replace(matchingButton[0], nowTS);
+      } else blockContent = nowTS + " " + blockContent;
+      let focusedBlock = window.roamAlphaAPI.ui.getFocusedBlock();
+      updateBlock(blockUID, blockContent);
+      setTimeout(() => {
+        window.roamAlphaAPI.ui.setBlockFocusAndSelection({
+          location: focusedBlock,
+        });
+      }, 200);
+      return true;
+    } else return true;
   }
   let begin = new TimeStamp(matchingTT[0][0]);
   let end;
@@ -97,6 +108,24 @@ export async function elapsedTime(blockUID) {
 
   let rightPart = title.trim() + hourTag;
   compareToLimitsAndUpdate(blockUID, title, leftPart, rightPart, elapsed);
+  return true;
+}
+
+async function searchTimestampInParentBlock(currentBlockUid) {
+  let parentUid = getParentUID(currentBlockUid);
+  let content = getBlockContent(parentUid);
+  if (!content) return false;
+  return await elapsedTime(parentUid, false);
+}
+function searchTimestampInPreviousSibbling(currentBlockUid) {
+  let parentUid = getParentUID(currentBlockUid);
+  let order = getBlockAttributes(currentBlockUid).order;
+  let previousSibbling = getChildrenTree(parentUid).find(
+    (block) => block.order == order - 1
+  );
+  if (previousSibbling?.string.match(timestampRegex)?.length == 1) {
+    elapsedTime(previousSibbling.uid);
+  }
 }
 
 function compareToLimitsAndUpdate(

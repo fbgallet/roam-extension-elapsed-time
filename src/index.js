@@ -37,7 +37,9 @@ export var confirmPopup,
   totalFormat,
   limitFormat,
   autoCopyTotalToClipboard,
-  displayTotalAsTable;
+  displayTotalAsTable,
+  remoteElapsedTime,
+  includePomodoros;
 export const limitFlagDefault = {
   task: {
     goal: { success: "🎯", failure: "⚠️" },
@@ -569,6 +571,67 @@ export default {
       tabTitle: "Time Tracker",
       settings: [
         {
+          id: "remoteTime",
+          name: "Remote elapsed time",
+          description:
+            "Experimental option for Elapsed time command: Search for timestamp in parent or previous sibbling block before inserting a timestamp in current block:",
+          action: {
+            type: "switch",
+            onChange: () => {
+              remoteElapsedTime = !remoteElapsedTime;
+            },
+          },
+        },
+        {
+          id: "displayTotalSetting",
+          name: "Display total mode",
+          description:
+            "Display inline total as blocks outline or as Roam {{table}}",
+          action: {
+            type: "select",
+            items: ["blocks", "table"],
+            onChange: (sel) => {
+              sel === "blocks"
+                ? (displayTotalAsTable = false)
+                : (displayTotalAsTable = true);
+            },
+          },
+        },
+        {
+          id: "displaySetting",
+          name: "Display subcategories",
+          description: "Display subcategories in Total",
+          action: {
+            type: "switch",
+            onChange: () => {
+              displaySubCat = !displaySubCat;
+            },
+          },
+        },
+        {
+          id: "pomodoros",
+          name: "Pomodoros",
+          description: "Take pomodoros into account in total calculation:",
+          action: {
+            type: "switch",
+            onChange: () => {
+              includePomodoros = !includePomodoros;
+            },
+          },
+        },
+        {
+          id: "autoCopyToClipboard",
+          name: "Copy total to clipboard",
+          description:
+            "Automatically copy simple total time table to clipboard when displaying total:",
+          action: {
+            type: "switch",
+            onChange: (evt) => {
+              autoCopyTotalToClipboard = !autoCopyTotalToClipboard;
+            },
+          },
+        },
+        {
           id: "categoriesSetting",
           name: "Categories",
           description:
@@ -637,32 +700,6 @@ export default {
               else {
                 limitFlag = limitFlagDefault;
               }
-            },
-          },
-        },
-        {
-          id: "displayTotalSetting",
-          name: "Display total mode",
-          description:
-            "Display inline total as blocks outline or as Roam {{table}}",
-          action: {
-            type: "select",
-            items: ["blocks", "table"],
-            onChange: (sel) => {
-              sel === "blocks"
-                ? (displayTotalAsTable = false)
-                : (displayTotalAsTable = true);
-            },
-          },
-        },
-        {
-          id: "displaySetting",
-          name: "Display subcategories",
-          description: "Display subcategories in Total time per day",
-          action: {
-            type: "switch",
-            onChange: () => {
-              displaySubCat = !displaySubCat;
             },
           },
         },
@@ -763,22 +800,15 @@ export default {
             },
           },
         },
-        {
-          id: "autoCopyToClipboard",
-          name: "Copy total to clipboard",
-          description:
-            "Automatically copy simple total time table to clipboard when displaying total:",
-          action: {
-            type: "switch",
-            onChange: (evt) => {
-              autoCopyTotalToClipboard = !autoCopyTotalToClipboard;
-            },
-          },
-        },
       ],
     };
-
     extensionAPI.settings.panel.create(panelConfig);
+    if (extensionAPI.settings.get("remoteTime") == null)
+      extensionAPI.settings.set("remoteTime", true);
+    remoteElapsedTime = extensionAPI.settings.get("remoteTime");
+    if (extensionAPI.settings.get("pomodoros") == null)
+      extensionAPI.settings.set("pomodoros", true);
+    includePomodoros = extensionAPI.settings.get("pomodoros");
     categoriesUID = normalizeUID(
       extensionAPI.settings.get("categoriesSetting")
     );
