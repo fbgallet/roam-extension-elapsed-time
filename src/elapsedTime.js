@@ -34,7 +34,7 @@ var appendHourTag = false; // add a tag with the round current hour, like #19:00
 /**********************************************************************/
 
 const timestampRegex = /[0-9]{1,2}:[0-9]{1,2}/g;
-const timestampButtonRegex = /{{[^\}]*:SmartBlock:[^\}]*buttons}}/;
+const timestampButtonRegex = /{{[^\}]*:SmartBlock:[^\}]*buttons?}}/;
 class TimeStamp {
   constructor(stringTT) {
     this.original = stringTT;
@@ -56,7 +56,7 @@ class TimeStamp {
   }
 }
 
-export async function elapsedTime(blockUID, firstLoop = true) {
+export async function elapsedTime(blockUID, separator = null) {
   let hourTag = "";
   let blockContent = getBlockContent(blockUID);
   blockContent = blockContent.replace(" {{⇥🕞:SmartBlock:Elapsed time}}", "");
@@ -68,8 +68,10 @@ export async function elapsedTime(blockUID, firstLoop = true) {
     // if (!hasTSinParent && firstLoop) {
     if (remoteElapsedTime) searchTimestampInPreviousSibbling(blockUID);
     let now = new Date();
-    let nowTS = new TimeStamp(now.getHours() + ":" + now.getMinutes())
-      .normalizedTT;
+    separator = separator ? " " + separator : "";
+    let nowTS =
+      new TimeStamp(now.getHours() + ":" + now.getMinutes()).normalizedTT +
+      separator;
     let matchingButton = blockContent.match(timestampButtonRegex);
     if (matchingButton) {
       if (matchingButton[0].includes("Double"))

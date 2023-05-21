@@ -46,7 +46,12 @@ let outputForClipboard;
 /* TOTAL TIME ON CURRENT PAGE
 /*========================================================================*/
 
-export async function totalTime(currentUID, scopeUid, byCategories = true) {
+export async function totalTime(
+  currentUID,
+  scopeUid,
+  byCategories = true,
+  asTable = displayTotalAsTable
+) {
   let total = 0;
   resetTotalTimes();
   let parentUID;
@@ -77,7 +82,7 @@ export async function totalTime(currentUID, scopeUid, byCategories = true) {
     position
   );
   if (byCategories) {
-    displayTotalAsTable
+    asTable
       ? insertTableOfTotalByCategory(totalOutput, totalUid, "", 0)
       : insertTotalTimeByCategory(totalUid, totalOutput);
     if (totalOutput.time != 0 && totalOutput.children.length != 0)
@@ -324,14 +329,18 @@ class DayLog {
 
 export var mainDailyLog;
 
-export async function totalTimeForGivenPeriod(period, uid) {
+export async function totalTimeForGivenPeriod(
+  period,
+  uid,
+  asTable = displayTotalAsTable
+) {
   if (!period) {
     period = await getNbOfDaysFromBlock(uid);
   }
   let startUid = await getCurrentBlockUidOrCreateIt();
   setTimeout(async () => {
     let total = await getTotalTimeFromPreviousDays(startUid, null, period);
-    displayTotalByPeriod(startUid, total, period);
+    displayTotalByPeriod(startUid, total, period, asTable);
   }, 50);
 }
 
@@ -367,10 +376,15 @@ async function sumDailyLogs(dnpUidArray) {
   return sumOfArrayElements(total);
 }
 
-export function displayTotalByPeriod(uid, total, period) {
+export function displayTotalByPeriod(
+  uid,
+  total,
+  period,
+  asTable = displayTotalAsTable
+) {
   let totalOutput = getTotalTimeOutput(total, period);
   let totalUid = prepareTotalTimeInsersion(uid, totalOutput.text, -1);
-  displayTotalAsTable
+  asTable
     ? insertTableOfTotalByCategory(totalOutput, totalUid, "", 0)
     : insertTotalTimeByCategory(totalUid, totalOutput);
   if (totalOutput.children.length != 0) copyTotalToClipboard();
@@ -444,6 +458,7 @@ export function getTotalTimeForCurrentPage(triggerUid, pageUid) {
       : getTotalTimeInTree(getChildrenTree(ref[0]), uidToExclude);
   });
   let totalOutput = getTotalTimeOutput(total);
+  console.log(totalOutput);
   let totalUid = prepareTotalTimeInsersion(triggerUid, totalOutput.text);
 }
 
@@ -468,15 +483,16 @@ function hasElapsedTimeInChildren(tree) {
 // FUNCTIONS FOR OUTPUT AND DISPLAY TOTALS
 /*========================================================================*/
 class Output {
-  constructor(s, n, t = 0) {
+  constructor(s, n, t = 0, l = null) {
     this.text = s;
     this.name = n;
     this.time = t;
+    this.limit = l;
     this.children = [];
   }
 
-  setChildren(t) {
-    this.children = t;
+  setChildren(child) {
+    this.children = child;
   }
   addChild(child) {
     this.children.push(child);
@@ -486,12 +502,18 @@ class Output {
   }
 }
 
-function formatDisplayTime(w, title, formatTag, hide = false) {
+function formatDisplayTime(
+  w,
+  title,
+  period = "day",
+  formatTag = "",
+  hide = false
+) {
   let t;
   let l = "";
   if (w != null) {
     t = w.time;
-    l = displayLimit(w);
+    l = displayLimit(w, period);
   } else t = uncategorized;
   if (title == "") {
     return totalTitle
@@ -517,75 +539,82 @@ function formatDisplayTime(w, title, formatTag, hide = false) {
   );
 }
 
-function displayLimit(w) {
+function displayLimit(w, period = "day") {
   let flag = "";
   let comp = "";
-  if (w.limit != null) {
-    if (w.limit.type != "undefined" && w.limit.day != 0) {
-      if (w.limit.type == "goal") {
-        if (w.time >= w.limit.day) {
-          flag = limitFlag.day.goal.success;
-          comp = ">=";
-        } else {
-          flag = limitFlag.day.goal.failure;
-          comp = "<";
-        }
-      } else if (w.limit.type == "limit") {
-        if (w.time <= w.limit.day) {
-          flag = limitFlag.day.limit.success;
-          comp = "<=";
-        } else {
-          flag = limitFlag.day.limit.failure;
-          comp = ">";
-        }
+  if (w.limit != null && w.limit.type != "undefined" && w.limit[period] > 0) {
+    if (w.limit.type == "goal") {
+      if (w.time >= w.limit[period]) {
+        flag = limitFlag.day.goal.success;
+        comp = ">=";
+      } else {
+        flag = limitFlag.day.goal.failure;
+        comp = "<";
       }
-      let r = limitFormat.replace("<type>", w.limit.type);
-      r = r.replace("<value>", w.limit.day.toString());
-      r = r.replace("<comp>", comp);
-      r = r.replace("<flag>", flag);
-      return r;
+    } else if (w.limit.type == "limit") {
+      if (w.time <= w.limit[period]) {
+        flag = limitFlag.day.limit.success;
+        comp = "<=";
+      } else {
+        flag = limitFlag.day.limit.failure;
+        comp = ">";
+      }
     }
+    let r = limitFormat.replace("<type>", w.limit.type);
+    r = r.replace(
+      "<value>",
+      convertMinutesTohhmm(w.limit[period])
+      //   w.limit[period] > 59
+      //     ? convertMinutesTohhmm(w.limit[period])
+      //     : w.limit[period].toString()
+    );
+    r = r.replace("<comp>", comp);
+    r = r.replace("<flag>", flag);
+    return r;
   }
   return "";
 }
 
-function getTotalTimeOutput(total, period = null) {
+function getTotalTimeOutput(total, period = "day") {
+  let periodToDisplay;
   if (period && isNaN(period)) {
-    if (!period.includes("last")) period = `period: in current ${period}`;
-    else period = `period: ${period}`;
+    if (!period.includes("last"))
+      periodToDisplay = `period: in current ${period}`;
+    else periodToDisplay = `period: ${period}`;
   } else if (period && !isNaN(period))
-    period = "period: since " + period + " days:";
-  else period = "";
+    periodToDisplay = "period: since " + period + " days:";
+  else periodToDisplay = "";
   console.log(categoriesArray);
   let totalToBeCalculated = false;
   let displayTotal;
   //console.log(total);
-  console.log(period);
-  if (total != 0) displayTotal = formatDisplayTime({ time: total }, period, "");
+  console.log(periodToDisplay);
+  if (total != 0)
+    displayTotal = formatDisplayTime({ time: total }, periodToDisplay, period);
   else totalToBeCalculated = true;
   let totalOutput = new Output(displayTotal);
   let parentCategories = categoriesArray.filter((cat) => !cat.parent);
   parentCategories.forEach((parent) => {
-    setCategoryOutput(parent, totalOutput);
+    setCategoryOutput(parent, totalOutput, period);
     total += parent.time;
   });
   if (uncategorized != 0)
     totalOutput.addChild(
       new Output(
-        formatDisplayTime(null, "__Uncategorized__", ""),
+        formatDisplayTime(null, "__Uncategorized__"),
         "Uncategorized",
         uncategorized
       )
     );
   total += uncategorized;
   if (totalToBeCalculated)
-    displayTotal = formatDisplayTime({ time: total }, period, "");
+    displayTotal = formatDisplayTime({ time: total }, periodToDisplay, period);
   totalOutput.time = total;
   totalOutput.text = displayTotal;
   return totalOutput;
 }
 
-function setCategoryOutput(category, parentOutput) {
+function setCategoryOutput(category, parentOutput, period = "day") {
   if (category.time != 0) {
     let title;
     if (titleIsRef && category.type === "text") {
@@ -603,13 +632,21 @@ function setCategoryOutput(category, parentOutput) {
     let formatedCatTotal = formatDisplayTime(
       category,
       title,
+      period,
       category.format,
       hideTime
     );
-    let output = new Output(formatedCatTotal, title, category.time);
+    let output = new Output(
+      formatedCatTotal,
+      title,
+      category.time,
+      displayLimit(category, period)
+    );
     parentOutput.addChild(output);
     if (displaySubCat && category.children) {
-      category.children.forEach((child) => setCategoryOutput(child, output));
+      category.children.forEach((child) =>
+        setCategoryOutput(child, output, period)
+      );
     }
   }
 }
@@ -698,6 +735,9 @@ function insertTableOfTotalByCategory(
         ? convertMinutesTohhmm(cat.time)
         : cat.time.toString();
       simpleCreateBlock(nameUid, timeUid, format + time + format);
+      if (cat.limit) {
+        simpleCreateBlock(timeUid, null, cat.limit);
+      }
       if (cat.children.length > 0) {
         insertTableOfTotalByCategory(cat, parentUid, shift + "   ");
       }

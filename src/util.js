@@ -1,5 +1,7 @@
 import { durationRegex } from ".";
 
+const limitDurationRegex = /([0-9][0-9]?[0-9]?) ?(h|'|min)([0-9]{1,2})?/i;
+
 const numberRegex =
   /\d+|one|two|three|for|five|six|seven|height|nine|ten|eleven|twelve|thirteen|fourteen|fithteen|twenty|thirty|forty|fithty|sixty|hundred/;
 const periodRegex =
@@ -259,6 +261,20 @@ export function convertMinutesTohhmm(time) {
   }
   timeString += m;
   return timeString;
+}
+
+export function convertStringDurationToMinutes(string) {
+  let match = string.match(limitDurationRegex);
+  if (!match) return null;
+  let min = 0,
+    h = 0;
+  if (match[2] === "'" || match[2] === "min") {
+    min = parseInt(match[1]);
+  } else if (match[2].toLowerCase() === "h") {
+    h = parseInt(match[1]);
+    min = match[3] != undefined ? parseInt(match[3]) : 0;
+  }
+  return min + h * 60;
 }
 
 export function getYesterdayDate(date = null) {

@@ -12,6 +12,7 @@ import {
 } from "./totalTime";
 import {
   addPullWatch,
+  convertStringDurationToMinutes,
   escapeCharacters,
   getBlockAttributes,
   getChildrenTree,
@@ -99,6 +100,8 @@ class Category {
     this.limit.type = "undefined";
     this.limit.task = 0;
     this.limit.day = 0;
+    this.limit.week = 0;
+    this.limit.month = 0;
   }
   addTime(time) {
     this.time += time;
@@ -234,13 +237,14 @@ export function getLimits(uid) {
   let tree = uid ? getChildrenTree(uid) : null;
   if (tree) {
     tree.forEach((limitType) => {
-      if (limitType.string.toLowerCase().includes("goal")) {
+      if (limitType.string?.toLowerCase().includes("goal")) {
         getLimitsInterval("goal", limitType.children);
-      } else if (limitType.string.toLowerCase().includes("limit")) {
+      } else if (limitType.string?.toLowerCase().includes("limit")) {
         getLimitsInterval("limit", limitType.children);
       }
     });
   } else resetLimits();
+  console.log(categoriesArray);
 }
 
 function resetLimits() {
@@ -250,11 +254,17 @@ function resetLimits() {
 function getLimitsInterval(type, tree) {
   if (tree) {
     tree.forEach((limitInterval) => {
-      let content = limitInterval.string.toLowerCase();
-      if (content.includes("day")) {
-        getLimitsByTypeAndInterval(type, "day", limitInterval.children);
-      } else if (content.includes("interval")) {
-        getLimitsByTypeAndInterval(type, "task", limitInterval.children);
+      let content = limitInterval.string?.toLowerCase();
+      if (limitInterval.children) {
+        if (content.includes("day")) {
+          getLimitsByTypeAndInterval(type, "day", limitInterval.children);
+        } else if (content.includes("interval")) {
+          getLimitsByTypeAndInterval(type, "task", limitInterval.children);
+        } else if (content.includes("week")) {
+          getLimitsByTypeAndInterval(type, "week", limitInterval.children);
+        } else if (content.includes("month")) {
+          getLimitsByTypeAndInterval(type, "month", limitInterval.children);
+        }
       }
     });
   }
@@ -264,14 +274,17 @@ function getLimitsByTypeAndInterval(type, interval, tree) {
   if (tree) {
     tree.forEach((limitDuration) => {
       if (limitDuration.children) {
-        let duration = limitDuration.string.replace(/[^0-9]+/g, "");
+        let duration = limitDuration.string
+          ? convertStringDurationToMinutes(limitDuration.string)
+          : undefined;
+        limitDuration.string.replace(/[^0-9]+/g, "");
         if (!isNaN(duration)) {
           limitDuration.children.forEach((catRef) => {
             let tw = categoriesArray.find(
-              (item) => item.uid === catRef.string.slice(2, -2)
+              (item) => item.uid === catRef.string?.slice(2, -2)
             );
             if (tw == undefined)
-              tw = searchSubCatByUidOrWord(catRef.string.slice(2, -2), "uid");
+              tw = searchSubCatByUidOrWord(catRef.string?.slice(2, -2), "uid");
             if (tw != null && tw != undefined)
               tw.setLimit(type, interval, parseInt(duration));
           });
@@ -487,29 +500,40 @@ function registerSmartblocksCommands(extensionAPI) {
   const panel = extensionAPI;
   const elapCmd = {
     text: "ELAPSEDTIME",
-    help: "Calcul elapsed time between now an a timestamps at the beginning of the block",
-    handler: (context) => () => {
-      elapsedTime(context.targetUid);
-      return "";
-    },
+    help:
+      "Insert a now timestamp, or if there is already one, calculates the elapsed time from now." +
+      "\n- First argument(optional): separator to insert between elapsed time and the rest of the content of the block.",
+    handler:
+      (context) =>
+      (separator = null) => {
+        elapsedTime(context.targetUid, separator);
+        return "";
+      },
   };
   const totalCmd = {
     text: "TOTALTIME",
     help:
-      "Calcul total elapsed time in current page (by default)." +
-      "\n- First argument (optional): period (week, month, quarter or year)." +
-      "\n- Second argument (optional): if true, return only total, without categories.",
+      "Calcul total elapsed time in current page (by default) or given period of time." +
+      "\n- First argument (optional): period (week, month, quarter or year) or day by default," +
+      "\n- Second argument (optional): if false (by default), display as blocks; if true, display as table," +
+      "\n- Second argument (optional): if false, return only total, without categories; true by default.",
     handler:
       (context) =>
-      async (period = null, byCategories = true) => {
+      async (period = null, asTable = "false", byCategories = "true") => {
         //period = context.variables.period;
-        if (!period)
+        if (!period || period == "day")
           totalTime(
             context.targetUid,
             await getPageUidByAnyBlockUid(context.targetUid),
-            byCategories === false ? false : true
+            byCategories === "false" ? false : true,
+            asTable === "true" ? true : false
           );
-        else totalTimeForGivenPeriod(period, context.targetUid);
+        else
+          totalTimeForGivenPeriod(
+            period,
+            context.targetUid,
+            asTable === "true" ? true : false
+          );
         return "";
       },
   };

@@ -35,11 +35,15 @@ export async function createSettingsPage(extensionAPI) {
   );
   createBlock(
     helpUid,
-    "Simply write your categories below, as plain text, or block ref, or page ref. You can add as many categories and levels of subcategories as you need."
+    "Simply write your categories below, in place of the examples, as plain text, or block ref, or page ref. You can add as many categories and levels of subcategories as you need."
   );
   createBlock(
     helpUid,
-    "Copy/paste block ref of categories in children of any given goal or limit time. You can add any duration as you need."
+    "Copy/paste block ref or Ctrl+drag&drop a given category to a child block of any given goal or limit time. You can remove or add any duration as you need, in min' or h format."
+  );
+  createBlock(
+    helpUid,
+    "Changes are instantly taken into account, you do not need to refresh your graph."
   );
   //let settingsUid = await createBlock(pageUid, "User settings", true, 1, true);
 
@@ -90,11 +94,27 @@ export async function createLimitsBlock(parentUid, extensionAPI) {
   return titleUid;
 
   async function addIntervalByPeriod(uid) {
-    let periodsUid = await addChildrenBlocks(uid, ["/interval", "/day"], true);
+    let periodsUid = await addChildrenBlocks(
+      uid,
+      ["/interval", "/day", "/week", "/month"],
+      true
+    );
     //console.log(periodsUid);
     if (periodsUid)
-      periodsUid.forEach((period) =>
-        addChildrenBlocks(period, ["15'", "30'", "45'", "60'"])
-      );
+      periodsUid.forEach((period, index) => {
+        switch (index) {
+          case 0:
+            addChildrenBlocks(period, ["15'", "30'", "45'", "1h", "1h30"]);
+            break;
+          case 1:
+            addChildrenBlocks(period, ["30'", "45'", "1h", "2h", "3h"]);
+            break;
+          case 2:
+            addChildrenBlocks(period, ["1h", "2h", "4h", "8h"]);
+            break;
+          case 3:
+            addChildrenBlocks(period, ["1h", "4h", "8h", "20h", "100h"]);
+        }
+      });
   }
 }
