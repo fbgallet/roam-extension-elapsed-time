@@ -10,6 +10,7 @@ v.2 (may 20th, 2023) Major update
 ### Updates:
   - `Elapsed time` command is way more versatile and replace existing buttons by timestamp
   - Categories admit any number of sub-categories levels
+  - Goals & limits can be set for week or month
   - A page reference `[[category]]` is applied to all children elapsed times (unless a distinct, not sub-category of the former, is mentioned)
   - Pomodoros are taken into account in total (in option)
 
