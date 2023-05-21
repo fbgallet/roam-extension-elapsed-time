@@ -56,31 +56,9 @@ If categories, and Goals & Limits blocks are not already defined, run `Time Trac
   - You can mention multiple categories in the same block, time will be added in all of them.
 
 ### Goals and limits
-- For each category or sub-category, you can define a goal (minimum to reach) or a limit (maximum not to exceed). Depending on whether the limit is respected or not, a flag (by default, a set of icon but you can switch to color tags or customize your own flags) will be inserted in the block, after elapsed time or total time spent. By default, a popup window will ask for confirmation before inserting the flag for the current task. It will be automatically applied in the total time blocks. Goals or limits can be defined both for an interval (elapsed time between two timestamps for a given task) or for the day (list of intervals in the current page).
-- To configure goal or limit, copy/paste the block reference of a given category as a child of a numeric indication of the correspond time, child of `/interval` or `/day` block.
+- For each category or sub-category, you can define a goal (minimum to reach) or a limit (maximum not to exceed). Depending on whether the limit is respected or not, a flag (by default, a set of icon but you can switch to color tags or customize your own flags) will be inserted in the block, after elapsed time or total time spent. By default, a popup window will ask for confirmation before inserting the flag for the current task. It will be automatically applied in the total time blocks. Goals or limits can be defined both for an interval (elapsed time between two timestamps for a given task) or for a period: day, week or month.
+- To configure goal or limit, copy/paste the block reference of a given category as a child of a numeric indication of the correspond time, child of `/interval` or `/day` block. Duration can be written in minutes (e.g.: 30') or in hours (e.g.: 2h30)
 - You can set a goal or a limit inline, only for the current block, with `min:` and `max:` keyword, followed by a number of minutes. Native pomodoro timer is also taken into account as a limit (maximum) time.
-
-  ```
-  - Parent block [copy its block reference in settings panel]
-    - Goals
-      - interval
-        -10'
-          - ((block reference of a category or subcategory))
-          - ...
-        - 20'
-          - ((...))
-      - day
-        - 60'
-          - ((...))
-    - Limits
-      [same kind of structure as for Goals]
-      - interval
-        - ...
-      - day
-        - ...
-  ```
-
-- Follow the instructions for other user settings directly in the settings panel above.
 
 ## SmartBlocks commands
 
@@ -92,8 +70,13 @@ Once 'Smartblocks extension' from RoamDepot is installed, install 'TimeStamp But
     - `{{🕗↦:SmartBlock:Double timestamp buttons}}`: **in your daily template** for creating the **first timestamp**, which will allow to generate an indefinite number of intervals with a simple click.
     - `{{Total 🕗:SmartBlock:Total time spent}}`: where you want to calculate the **total time** spent during the day, **either in a sibling block** to the blocks containing the elapsed times, **or in their parent block**. You can also run `Total time button` to create this button in the right place.
     - `{{🕗:SmartBlock:Strict interstitial journaling}}`: use it you want that the end timestamp of a given time interval to be exactly the beginning of the next one
-  - `<%TOTALTIME:period%>` is a SmartBlock command to calculate the total for a given period of time (day by default, week, month, quarter, year)
-  - You can copy and adapt the existing SmartBlocks to your needs (with a new name, otherwise they will be overwritten in case of update) or use `<%ELAPSEDTIME%>` and `<%TOTALTIME%>` commands in your own SmartBlocks.
+
+You can copy and adapt the existing SmartBlocks to your needs (with a new name, otherwise they will be overwritten in case of update)
+
+### SmartBlocks commands to insert in your own SmartBlocks:
+  - `<%ELAPSEDTIME:separator%>`: run the same command as `Time tracker: Elapsed time`, but you can specify the separator between the time interval and the rest of the block. For example, if you want to use `|` separator, the command will be: `<%ELAPSEDTIME:|%>`
+  - `<%TOTALTIME:period,as table,categories%>` is a SmartBlock command to calculate the total for a given period of time (day by default, week, month, quarter, year). By default, total is displayed as blocks, with categories subtotals. For example, if you want to display the total for the current week as a table with all categories, the command will be: `<%TOTALTIME:week,true,true%>`
+  -  or use  and `<%TOTALTIME%>` commands in your own SmartBlocks.
 
 ---
 
