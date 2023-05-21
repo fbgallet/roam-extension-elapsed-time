@@ -23,7 +23,7 @@ Calculate and insert elapsed time between two timestamp. The `Elapsed time` comm
 
 💡 If you set hotkeys for this command, **it will very easy, with the same hotkeys**, to insert a first timestamp, then insert the second and get the elapsed time.
 
-💥 with `Remote elapsed time` enabled (by default), if there is no timestamp in current block, a timestamp to be completed with a second one is searched in the neartest parent blocks and, if none, in the previous sibbling block. So that the elapsed time will be calculated in the remote block. The now timestamp will also be inserted in the current block if elapsed time has been calculated in the previous sibbling block. This way, you need only press given hotkeys one time to both calculate previous elapsed time and set the begin timestamp for the next activity, which makes interstitial journaling as seamless as possible.
+💥 with `Remote elapsed time` enabled (by default), if there is no timestamp in current block, a timestamp to be completed with a second one is searched in the previous sibbling block. So that the elapsed time will be calculated in the remote block. The now timestamp will also be inserted in the current block. This way, you need to press the hotkeys only one time to both calculate previous elapsed time and set the begin timestamp for the next activity, which makes interstitial journaling as seamless as possible.
 
 Another way to insert easily timestamps and run this command is to use SmartBlocks command. For instructions, see 'SmartBlocks commands' section below.
 
