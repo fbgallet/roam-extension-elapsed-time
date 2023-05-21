@@ -574,7 +574,7 @@ export default {
           id: "remoteTime",
           name: "Remote elapsed time",
           description:
-            "Experimental option for Elapsed time command: Search for timestamp in parent or previous sibbling block before inserting a timestamp in current block:",
+            "When running Elapsed time command, search for a timestamp in the previous sibbling block and calculate corresponding elapsed time before inserting a timestamp in current block:",
           action: {
             type: "switch",
             onChange: () => {
