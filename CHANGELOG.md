@@ -1,7 +1,7 @@
-v.2 (may 20th, 2023) Major update
+## v.2 (June 12th, 2023) **Major update**
 ### New features:
   - **Total by period** ! Week, month, quarter, year or any given period
-  - Total is now calculated on all levels, not only sibbling blocks
+  - Total is now calculated on all block levels, not only sibbling blocks
   - Total for a given page and all its references
   - Simplified configuration with `Set categories and Goals & limits` command and Categories and Goals & limits changes auto-updated
   - Roam {{table}} view of total (in option), also copied to clipboard for easy export
