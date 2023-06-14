@@ -1,11 +1,11 @@
 ## v.2 (June 12th, 2023) **Major update**
 ### New features:
   - **Total by period** ! Week, month, quarter, year or any given period
-  - Total is now calculated on all block levels, not only sibbling blocks
-  - Total for a given page and all its references
+  - Total on current page is now calculated on all block levels, not only sibbling blocks
   - Simplified configuration with `Set categories and Goals & limits` command and Categories and Goals & limits changes auto-updated
   - Roam {{table}} view of total (in option), also copied to clipboard for easy export
   - `Remote elapsed time` for very seamless interstitial journaling
+  - Total for a given page and all its references
 
 ### Updates:
   - `Elapsed time` command is way more versatile and replace existing buttons by timestamp
