@@ -252,15 +252,23 @@ export function convertMinutesTohhmm(time) {
   let timeString = "";
   if (h > 0) {
     timeString += h + "h";
-  }
-  if (m < 10) {
-    m = "0" + m.toString();
+    if (m < 10) {
+      m = "0" + m.toString();
+    }
   }
   if (h == 0) {
     m += "'";
   }
   timeString += m;
   return timeString;
+}
+
+export function convertMinutesToDecimals(minutes) {
+  let hours = Math.floor(minutes / 60);
+  let decimal = (minutes % 60) / 60;
+  decimal = parseFloat(decimal.toFixed(2));
+  let hourDecimal = hours + decimal;
+  return hourDecimal;
 }
 
 export function convertStringDurationToMinutes(string) {
@@ -356,7 +364,7 @@ export async function getNbOfDaysFromBlock(uid) {
   if (last && period) {
     result = "last " + period[0];
   }
-  console.log(result);
+  //console.log(result);
   return result;
 }
 
@@ -364,7 +372,7 @@ function getLastDayOfPreviousWeek(day) {
   //let lastWeek = new Date(day.getTime() - 7 * 24 * 60 * 60 * 1000);
   let dayToSustract = day.getDay();
   if (dayToSustract == 0) dayToSustract = 7;
-  console.log(dayToSustract);
+  //console.log(dayToSustract);
   return new Date(day.getTime() - dayToSustract * 24 * 60 * 60 * 1000);
 }
 

@@ -13,6 +13,7 @@ import {
 } from ".";
 import { simpleIziMessage } from "./elapsedTime";
 import {
+  convertMinutesToDecimals,
   convertMinutesTohhmm,
   convertPeriodInNumberOfDays,
   dateIsInPeriod,
@@ -515,16 +516,32 @@ function formatDisplayTime(
     t = w.time;
     l = displayLimit(w, period);
   } else t = uncategorized;
+  let totalTitleToReturn = totalTitle;
   if (title == "") {
     return totalTitle
       .replace("<tm>", t.toString())
-      .replace("<th>", convertMinutesTohhmm(t));
+      .replace("<th>", convertMinutesTohhmm(t))
+      .replace("<td>", convertMinutesToDecimals(t));
   } else if (title.includes("period:")) {
-    return (
-      totalTitle
-        .replace("<tm>", t.toString())
-        .replace("<th>", convertMinutesTohhmm(t)) + ` ${title.slice(7)}`
-    );
+    let matchingPeriodPlaceholder = totalTitle.match(/\[.*<period>.*\]/g);
+    if (matchingPeriodPlaceholder)
+      if (totalTitle.includes("<period>") && matchingPeriodPlaceholder) {
+        if (!isNaN(period)) {
+          totalTitleToReturn = totalTitleToReturn.replace(
+            matchingPeriodPlaceholder[0],
+            title.split("period:")[1]
+          );
+        } else
+          totalTitleToReturn = totalTitle.replace(
+            matchingPeriodPlaceholder[0],
+            matchingPeriodPlaceholder[0].slice(1, -1)
+          );
+      }
+    return totalTitleToReturn
+      .replace("<period>", period)
+      .replace("<tm>", t.toString())
+      .replace("<td>", convertMinutesToDecimals(t))
+      .replace("<th>", convertMinutesTohhmm(t)); // + ` ${title.slice(7)}`
   }
   if (hide) return title;
   return (
@@ -532,11 +549,23 @@ function formatDisplayTime(
       .replace("<category>", title)
       .replace("<tm>", t.toString())
       .replace("<th>", convertMinutesTohhmm(t))
+      .replace("<td>", convertMinutesToDecimals(t))
       .replace("<limit>", l)
+      //  .replace("<diff>", getDifferenceWithLimit(t, l))
       .trim() +
     " " +
     formatTag
   );
+}
+
+export function getDifferenceWithLimit(time, limit) {
+  let diffToDisplay = "";
+  let diff = time - limit;
+  if (diff && diff !== 0)
+    diff > 0
+      ? (diffToDisplay = `+${convertMinutesTohhmm(diff)}`)
+      : (diffToDisplay = `${convertMinutesTohhmm(diff)}`);
+  return diffToDisplay;
 }
 
 function displayLimit(w, period = "day") {
@@ -560,16 +589,14 @@ function displayLimit(w, period = "day") {
         comp = ">";
       }
     }
-    let r = limitFormat.replace("<type>", w.limit.type);
-    r = r.replace(
-      "<value>",
-      convertMinutesTohhmm(w.limit[period])
-      //   w.limit[period] > 59
-      //     ? convertMinutesTohhmm(w.limit[period])
-      //     : w.limit[period].toString()
-    );
-    r = r.replace("<comp>", comp);
-    r = r.replace("<flag>", flag);
+    let diffToDisplay = getDifferenceWithLimit(w.time, w.limit[period]);
+
+    let r = limitFormat
+      .replace("<type>", w.limit.type)
+      .replace("<value>", convertMinutesTohhmm(w.limit[period]))
+      .replace("<flag>", flag)
+      .replace("<comp>", comp)
+      .replace("<diff>", diffToDisplay);
     return r;
   }
   return "";
@@ -578,17 +605,16 @@ function displayLimit(w, period = "day") {
 function getTotalTimeOutput(total, period = "day") {
   let periodToDisplay;
   if (period && isNaN(period)) {
-    if (!period.includes("last"))
-      periodToDisplay = `period: in current ${period}`;
+    if (!period.includes("last")) periodToDisplay = `period: ${period}`;
     else periodToDisplay = `period: ${period}`;
   } else if (period && !isNaN(period))
-    periodToDisplay = "period: since " + period + " days:";
+    periodToDisplay = "period: since " + period + " days";
   else periodToDisplay = "";
-  console.log(categoriesArray);
+  //console.log(categoriesArray);
   let totalToBeCalculated = false;
   let displayTotal;
   //console.log(total);
-  console.log(periodToDisplay);
+  //console.log(periodToDisplay);
   if (total != 0)
     displayTotal = formatDisplayTime({ time: total }, periodToDisplay, period);
   else totalToBeCalculated = true;

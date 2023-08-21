@@ -20,6 +20,7 @@ import {
   remoteElapsedTime,
   scanCategories,
 } from ".";
+import { getDifferenceWithLimit } from "./totalTime";
 
 /*======================================================================================================*/
 /* ELAPSED TIME SB */
@@ -203,8 +204,16 @@ function compareToLimitsAndUpdate(
     let textTitle = elapsed + "' elapsed.";
     let textMessage = limitType + " was ";
     let buttonCaption = "Too much anyway!";
-    let badFormat = limitFlag.task.limit.failure;
-    let goodFormat = limitFlag.task.goal.success;
+    let badFormat = getLimitFlagFormat(
+      limitFlag.task.limit.failure,
+      elapsed,
+      timeLimitMax
+    );
+    let goodFormat = getLimitFlagFormat(
+      limitFlag.task.goal.success,
+      elapsed,
+      timeLimitMin
+    );
 
     if (
       (!exceeded && !insufficient) ||
@@ -216,11 +225,23 @@ function compareToLimitsAndUpdate(
         goodFormat = limitFlag.task.goal.success;
       } else if (okUnder) {
         textMessage += "less than " + timeLimitMax + "'";
-        badFormat = limitFlag.task.limit.failure;
-        goodFormat = limitFlag.task.limit.success;
+        badFormat = getLimitFlagFormat(
+          limitFlag.task.limit.failure,
+          elapsed,
+          timeLimitMax
+        );
+        goodFormat = getLimitFlagFormat(
+          limitFlag.task.goal.success,
+          elapsed,
+          timeLimitMin
+        );
       } else {
         textMessage += "more than " + timeLimitMin + "'";
-        badFormat = limitFlag.task.goal.failure;
+        badFormat = getLimitFlagFormat(
+          limitFlag.task.goal.failure,
+          elapsed,
+          timeLimitMin
+        );
         buttonCaption = "Not enough anyway!";
       }
       if (confirmPopup) {
@@ -259,13 +280,25 @@ function compareToLimitsAndUpdate(
         textMessage += "between " + timeLimitMin + "' & " + timeLimitMax + "'";
         buttonCaption = "Too much!";
         if (insufficient) {
-          badFormat = limitFlag.task.goal.failure;
-          goodFormat = limitFlag.task.limit.success;
+          badFormat = getLimitFlagFormat(
+            limitFlag.task.goal.failure,
+            elapsed,
+            timeLimitMin
+          );
+          goodFormat = getLimitFlagFormat(
+            limitFlag.task.limit.success,
+            elapsed,
+            timeLimitMax
+          );
           buttonCaption = "Not enough!";
         }
       } else if ((!okUnder && !insufficient) || exceeded) {
         buttonCaption = "Too much!";
-        goodFormat = limitFlag.task.limit.success;
+        goodFormat = getLimitFlagFormat(
+          limitFlag.task.limit.success,
+          elapsed,
+          timeLimitMax
+        );
         if (!triggered) {
           textMessage = "Default alert time is " + timeLimitMax + "'";
         } else {
@@ -278,8 +311,16 @@ function compareToLimitsAndUpdate(
           textMessage += "more than " + timeLimitMin + " '.";
         }
         buttonCaption = "Not enough!";
-        badFormat = limitFlag.task.goal.failure;
-        goodFormat = limitFlag.task.goal.success;
+        badFormat = getLimitFlagFormat(
+          limitFlag.task.goal.failure,
+          elapsed,
+          timeLimitMin
+        );
+        goodFormat = getLimitFlagFormat(
+          limitFlag.task.goal.success,
+          elapsed,
+          timeLimitMin
+        );
       }
 
       if (confirmPopup) {
@@ -317,6 +358,14 @@ function compareToLimitsAndUpdate(
   }
   rightPart = removePreviousDuration(rightPart);
   updateBlock(blockUID, leftPart + rightPart);
+}
+
+function getLimitFlagFormat(flag, time, limit) {
+  if (!flag.includes("<diff>")) return flag;
+  let diffToDisplay;
+  diffToDisplay = getDifferenceWithLimit(time, limit);
+  let limitFlagFormat = flag.replace("<diff>", diffToDisplay).trim();
+  return limitFlagFormat;
 }
 
 function removePreviousDuration(content) {

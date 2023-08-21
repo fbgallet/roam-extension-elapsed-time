@@ -713,7 +713,7 @@ export default {
           id: "flagsSetting",
           name: "Customized Flags",
           description:
-            "Set flags to insert, separated by a comma: goal reached or not, (and optionally) limit respected or exceeded:",
+            "Set flags to insert, separated by a comma. Insert also time difference with goal/limit using <diff> placeholder.",
           action: {
             type: "input",
             placeholder: "goal-success,goal-fail [,limit-success,limit-fail]",
@@ -787,11 +787,11 @@ export default {
           id: "totalTitleSetting",
           name: "Total parent block format",
           description:
-            "Format of the 'Total time' parent block, use <th> (time in hour) or <tm> (time in minutes) placeholder:",
+            "Format of the 'Total time' parent block, use <th> (time in hour) or <tm> (time in minutes) or <td> (time in decimal) placeholder, and <period> placeholder:",
           action: {
             type: "input",
             onChange: (evt) => {
-              if (evt.target.value.includes("<th>"))
+              if (evt.target.value.search(/<th>|<tm>|<td>/) !== -1)
                 totalTitle = evt.target.value;
             },
           },
@@ -800,12 +800,12 @@ export default {
           id: "totalCatSetting",
           name: "Total per category format",
           description:
-            "Format of each category's 'Total time'. Placeholders: <th> or <tm> for total time, <category> and <limit> for limit format defined below:",
+            "Format of each category's 'Total time'. Placeholders: <th> or <tm> or <td> for total time, <category> and <limit> for limit format defined below:",
           action: {
             type: "input",
             onChange: (evt) => {
               if (
-                evt.target.value.includes("<th>") &&
+                evt.target.value.search(/<th>|<tm>|<td>/) !== -1 &&
                 evt.target.value.includes("<category>")
               )
                 totalFormat = evt.target.value;
@@ -816,7 +816,7 @@ export default {
           id: "limitFormatSetting",
           name: "Limit per category format",
           description:
-            "Format of the limit display for each category. Placeholders: <flag> for limit flag, <type> for 'Goal' or 'Limit', <value> for predefined limit value:",
+            "Format of the limit display for each category. Placeholders: <flag> for limit flag, <type> for 'Goal' or 'Limit', <value> for predefined limit value, <comp> for comparison sign (> or <) between time and limit:",
           action: {
             type: "input",
             onChange: (evt) => {
@@ -874,7 +874,10 @@ export default {
     splittedDurationFormat = getStringsAroundPlaceHolder(durationFormat, "<d>");
     setDurationRegex();
     if (extensionAPI.settings.get("totalTitleSetting") == null)
-      extensionAPI.settings.set("totalTitleSetting", "Total time: **<th>**");
+      extensionAPI.settings.set(
+        "totalTitleSetting",
+        "Total time [in current <period>::] **<th>**"
+      );
     totalTitle = extensionAPI.settings.get("totalTitleSetting");
     if (extensionAPI.settings.get("totalCatSetting") == null)
       extensionAPI.settings.set(
