@@ -1,4 +1,4 @@
-## v.3 (June 12th, 2023) small add-ons
+## v.3 (August 23rd, 2023) small add-ons
 ### Updates:
   - added `<diff>` placeholder for customizable flags inserted when the goals are achieved or not, and the limits are exceeded or not. Insert the time difference in minutes with the goal or the limit.or
   - added `<period>` placeholder for the total by period title (parent block): insert the period name (day, week, etc.) or the corresponding number of days if not a standard period.
