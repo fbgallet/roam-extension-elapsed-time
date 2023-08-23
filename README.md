@@ -4,7 +4,7 @@ Easily **track the time spent on your activities and calculate the total time sp
 
 Review total by day, week, month, quarter, year, or any given period of time.
 
-v.2 introduce a lot of new features, see [changelog here](https://github.com/fbgallet/roam-extension-elapsed-time/blob/main/CHANGELOG.md)
+v.2 introduces a lot of new features, see [changelog here](https://github.com/fbgallet/roam-extension-elapsed-time/blob/main/CHANGELOG.md)
 
 ![Elapsed time demo](https://user-images.githubusercontent.com/74436347/184550335-ac5acde2-c9f9-459b-8e30-ec239abd7041.gif)
 
@@ -27,10 +27,14 @@ Calculate and insert elapsed time between two timestamp. The `Elapsed time` comm
 
 Another way to insert easily timestamps and run this command is to use SmartBlocks command. For instructions, see 'SmartBlocks commands' section below.
 
+If categories and limits/goals have been set, and if you have mentionned a category in the current block, a popup will appear at the bottom indicating if the limit/goal has been reached or exceeded. By pressing the 'Too much' or 'Not enough' button (selected by default), the corresponding flag will be inserted into the block, right after the elapsed time.
+
+The flags are customizable (🎯,⚠️,👍,🛑 by default), you can change the icon and add a `<diff>` placeholder to insert the time difference with the limit or goal. For example, if the limit for Mail was 15' and the elapsed time is 25', `🛑+10` will be inserted.
+
 ### Total time
 Total is calculated as the sum of elapsed times (⚠️ formated by Time tracker, double timestamps without calculated elapsed time are not taken into account!) and pomodoros (if no elapsed time in the block, and whether or not they have been completed).
 
-It is displayed in a customizable format (category: **30'**) and in a basic outline of blocks by default, but cat also be displayed in Roam {{table}} and is copied in the clipboard in a simple text format. A development envisaged for a later version is to propose a dynamic table and a graphic visualization of the data.
+It is displayed in a customizable format (ex: `category: **30'**` with time expressed in minutes with `<tm>` placeholder, or hours and minutes with `<th>` or hours decimal with `<td>`). All totals and subtotals will be displayed in a basic outline of blocks by default, but cat also be displayed in Roam {{table}} and is copied in the clipboard in a simple text format. A development envisaged for a later version is to propose a dynamic table and a graphic visualization of the data.
 
 Total can be calculated in different range of data or periods, depending on the command used:
   - `total for current day or page`: total and subtotals are calculated by category. An elapsed time is added to one or more categories if they are in the same block or if a category (provided it is a reference page) is in a parent block (see "Categories, goals and limits configuration" for more information). 💥 Just enter 'day' in the command palette to get the command.
@@ -64,7 +68,7 @@ If categories, and Goals & Limits blocks are not already defined, run `Time Trac
 
 SmartBlocks make it easier to insert timestamps and trigger totals calculations with easily configurable buttons that can be inserted into your own templates.
 
-Once 'Smartblocks extension' from RoamDepot is installed, install 'TimeStamp Buttons and elapsed time calculator' from the SmartBlocks Store (open command palette with Ctrl-Cmd + P, then search for "SmartBlocks Store"). Then you can run a set of command to insert buttons or calcultate total on different period of time. The most useful for beginners is the following:
+Once 'Smartblocks extension' from RoamDepot is installed, copy [the SmartBlocks shared in this graph](https://roamresearch.com/#/app/Roam-En-Francais/page/Y0FgJscNZ) (since RoamJS SmartBlocks store in no more available) anywhere in your. Then you can run a set of command to insert buttons or calcultate total on different period of time. The most useful for beginners is the following:
 
   - `Day log - Elapsed time`: run it in your daily template to be prompted cyclically to insert a new timestamp and to calculate an elapsed time. You can also Copy/Paste the following buttons in your template (or keep the templates you used with the previous version, which remains compatible)
     - `{{🕗↦:SmartBlock:Double timestamp buttons}}`: **in your daily template** for creating the **first timestamp**, which will allow to generate an indefinite number of intervals with a simple click.
