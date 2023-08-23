@@ -8,6 +8,7 @@ v.2 introduces a lot of new features, see [changelog here](https://github.com/fb
 
 ![Elapsed time demo](https://user-images.githubusercontent.com/74436347/184550335-ac5acde2-c9f9-459b-8e30-ec239abd7041.gif)
 
+You can see a demo and small tutorial videos in this thread (to be completed): https://twitter.com/fbgallet/status/1668969876050829312
 
 ⚠️ This extension works more easily in combination with `TimeStamp Buttons and elapsed time calculator` **SmartBlocks**. See 'SmartBlocks commands' section below for instructions.
 
