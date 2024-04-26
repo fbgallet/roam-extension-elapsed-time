@@ -127,8 +127,8 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
       let matchingWords = blockContent.match(categoriesRegex);
       let triggeredCat;
       if (matchingWords) {
-        // console.log("matchingWords");
-        // console.log(matchingWords);
+        console.log("categoriesArray :>> ", categoriesArray);
+        console.log("matchingWords", matchingWords);
         triggeredCat = getTriggeredCategoriesFromNames(
           matchingWords,
           parentBlockCat
@@ -215,7 +215,29 @@ function getTriggeredCategories(filteredArray) {
     result = addOnlySupCatIfSynonym(filteredArray[0], lastName, result);
     filteredArray = filteredArray.slice(1);
   }
+  console.log("result before :>> ", result);
+  result = removeRedundantCat(result);
+  console.log("result after :>> ", result);
   return result;
+}
+
+function removeRedundantCat(catArray) {
+  const noRedundantCatArray = [];
+  for (let i = 0; i < catArray.length; i++) {
+    const cat = catArray[i];
+    const remainingArray = catArray.slice(i + 1);
+    let isAncestor =
+      remainingArray.length &&
+      remainingArray.some((someCat) => cat.isAncestorOf(someCat));
+    const previousArray = catArray.slice(0, i);
+    let hasSameAncestor =
+      previousArray.length &&
+      previousArray.some((someCat) => cat.hasSameAncestor(someCat));
+    if (!isAncestor && !hasSameAncestor) noRedundantCatArray.push(cat);
+  }
+  // noRedundantCatArray.push(catArray.at(-1));
+  console.log("noRedundantCatArray :>> ", noRedundantCatArray);
+  return noRedundantCatArray;
 }
 
 function addOnlySupCatIfSynonym(cat, lastCatName, catArray) {
@@ -615,7 +637,7 @@ function getTotalTimeOutput(total, period = "day") {
   let displayTotal;
   //console.log(total);
   //console.log(periodToDisplay);
-  if (total != 0)
+  if (total !== 0)
     displayTotal = formatDisplayTime({ time: total }, periodToDisplay, period);
   else totalToBeCalculated = true;
   let totalOutput = new Output(displayTotal);
@@ -722,9 +744,13 @@ function insertTotalTimeByCategory(uid, output, isSub = false) {
 
 function getListOfTotalByCategory(categories, shift = "") {
   categories.forEach((cat) => {
-    if (cat.time != 0)
-      outputForClipboard += shift + cat.name + "\t" + cat.time + "\n";
-    if (cat.time != 0 && cat.children != undefined) {
+    if (cat.time !== 0) {
+      let time = totalFormat.includes("<td>")
+        ? convertMinutesToDecimals(cat.time)
+        : cat.time;
+      outputForClipboard += shift + cat.name + "\t" + time + "\n";
+    }
+    if (cat.time !== 0 && cat.children != undefined) {
       getListOfTotalByCategory(cat.children, shift + "   ");
     }
   });
@@ -759,6 +785,8 @@ function insertTableOfTotalByCategory(
       let timeUid = window.roamAlphaAPI.util.generateUID();
       let time = totalFormat.includes("<th>")
         ? convertMinutesTohhmm(cat.time)
+        : totalFormat.includes("<td>")
+        ? convertMinutesToDecimals(cat.time)
         : cat.time.toString();
       simpleCreateBlock(nameUid, timeUid, format + time + format);
       if (cat.limit) {

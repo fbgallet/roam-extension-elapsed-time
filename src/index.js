@@ -118,6 +118,30 @@ class Category {
       return true;
     else return false;
   }
+  isAncestorOf(tw) {
+    let isAncestor = this.isParentOf(tw);
+    if (!isAncestor) {
+      isAncestor =
+        this.children.length &&
+        this.children.some((child) => child.isAncestorOf(tw));
+    }
+    return isAncestor;
+  }
+  // isDescendantOf(tw) {
+  //   let isDescendant = this.hasChildrenWithName(tw.name);
+  //   if (!isDescendant) {
+  //     isDescendant =
+  //       this.children.length &&
+  //       this.children.some((child) => child.isAncestorOf(tw));
+  //   }
+  //   return isAncestor;
+  // }
+  hasSameAncestor(tw) {
+    let hasSameAncestor = this.parent?.isAncestorOf(tw);
+    if (!hasSameAncestor && this.parent?.parent?.length)
+      hasSameAncestor = this.parent.hasSameAncestor(tw);
+    return hasSameAncestor;
+  }
   hasChildrenWithName(name) {
     return this.children.find((child) => child.name === name) != undefined;
   }
