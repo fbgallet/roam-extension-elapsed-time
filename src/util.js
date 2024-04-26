@@ -268,7 +268,7 @@ export function convertMinutesToDecimals(minutes) {
   let decimal = (minutes % 60) / 60;
   decimal = parseFloat(decimal.toFixed(2));
   let hourDecimal = hours + decimal;
-  return hourDecimal;
+  return hourDecimal.toFixed(2);
 }
 
 export function convertStringDurationToMinutes(string) {
