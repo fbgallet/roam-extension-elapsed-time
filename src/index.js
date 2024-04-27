@@ -41,7 +41,8 @@ export let confirmPopup,
   autoCopyTotalToClipboard,
   displayTotalAsTable,
   remoteElapsedTime,
-  includePomodoros;
+  includePomodoros,
+  includeEmbeds;
 export const limitFlagDefault = {
   task: {
     goal: { success: "🎯", failure: "⚠️" },
@@ -66,7 +67,7 @@ export let categoriesRegex;
 
 class Category {
   constructor(s, uid, refs, f, parent = null) {
-    this.name = s;
+    this.name = s.trim();
     this.uid = uid;
     this.display = true;
     this.type = this.getType(s);
@@ -638,7 +639,7 @@ function correctUidInput(uid) {
 }
 
 export default {
-  onload: ({ extensionAPI }) => {
+  onload: async ({ extensionAPI }) => {
     const panelConfig = {
       tabTitle: "Time Tracker",
       settings: [
@@ -688,6 +689,18 @@ export default {
             type: "switch",
             onChange: () => {
               includePomodoros = !includePomodoros;
+            },
+          },
+        },
+        {
+          id: "embeds",
+          name: "Include embeds",
+          description:
+            "Include embeded blocks in total calculation (Unless the original is on the same page):",
+          action: {
+            type: "switch",
+            onChange: () => {
+              includeEmbeds = !includeEmbeds;
             },
           },
         },
@@ -875,72 +888,75 @@ export default {
       ],
     };
     extensionAPI.settings.panel.create(panelConfig);
-    if (extensionAPI.settings.get("remoteTime") == null)
-      extensionAPI.settings.set("remoteTime", true);
+    if (extensionAPI.settings.get("remoteTime") === null)
+      await extensionAPI.settings.set("remoteTime", true);
     remoteElapsedTime = extensionAPI.settings.get("remoteTime");
-    if (extensionAPI.settings.get("pomodoros") == null)
-      extensionAPI.settings.set("pomodoros", true);
+    if (extensionAPI.settings.get("pomodoros") === null)
+      await extensionAPI.settings.set("pomodoros", true);
     includePomodoros = extensionAPI.settings.get("pomodoros");
+    if (extensionAPI.settings.get("embeds") === null)
+      await extensionAPI.settings.set("embeds", false);
+    includeEmbeds = extensionAPI.settings.get("embeds");
     categoriesUID = normalizeUID(
       extensionAPI.settings.get("categoriesSetting")
     );
     if (categoriesUID)
       getBlockAttributes(categoriesUID)
         ? addPullWatch(categoriesUID, getCategories)
-        : extensionAPI.settings.set("categoriesSetting", undefined);
+        : await extensionAPI.settings.set("categoriesSetting", undefined);
     limitsUID = normalizeUID(extensionAPI.settings.get("limitsSetting"));
     if (limitsUID)
       getBlockAttributes(limitsUID)
         ? addPullWatch(limitsUID, getLimits)
-        : extensionAPI.settings.set("limitsSetting", undefined);
-    if (extensionAPI.settings.get("displayTotalSetting") == null)
-      extensionAPI.settings.set("displayTotalSetting", "blocks");
+        : await extensionAPI.settings.set("limitsSetting", undefined);
+    if (extensionAPI.settings.get("displayTotalSetting") === null)
+      await extensionAPI.settings.set("displayTotalSetting", "blocks");
     extensionAPI.settings.get("displayTotalSetting") === "blocks"
       ? (displayTotalAsTable = false)
       : (displayTotalAsTable = true);
-    if (extensionAPI.settings.get("displaySetting") == null)
-      extensionAPI.settings.set("displaySetting", true);
+    if (extensionAPI.settings.get("displaySetting") === null)
+      await extensionAPI.settings.set("displaySetting", true);
     displaySubCat = extensionAPI.settings.get("displaySetting");
-    if (extensionAPI.settings.get("flagsDropdown") == null)
-      extensionAPI.settings.set("flagsDropdown", "🎯,⚠️,👍,🛑");
+    if (extensionAPI.settings.get("flagsDropdown") === null)
+      await extensionAPI.settings.set("flagsDropdown", "🎯,⚠️,👍,🛑");
     flagsDropdown = extensionAPI.settings.get("flagsDropdown");
-    if (extensionAPI.settings.get("flagsSetting") == null)
-      extensionAPI.settings.set("flagsSetting", "");
+    if (extensionAPI.settings.get("flagsSetting") === null)
+      await extensionAPI.settings.set("flagsSetting", "");
     customFlags = extensionAPI.settings.get("flagsSetting");
-    if (extensionAPI.settings.get("popupSetting") == null)
-      extensionAPI.settings.set("popupSetting", true);
+    if (extensionAPI.settings.get("popupSetting") === null)
+      await extensionAPI.settings.set("popupSetting", true);
     confirmPopup = extensionAPI.settings.get("popupSetting");
-    if (extensionAPI.settings.get("defaultTimeSetting") == null)
-      extensionAPI.settings.set("defaultTimeSetting", 90);
+    if (extensionAPI.settings.get("defaultTimeSetting") === null)
+      await extensionAPI.settings.set("defaultTimeSetting", 90);
     defaultTimeLimit = extensionAPI.settings.get("defaultTimeSetting");
-    if (extensionAPI.settings.get("intervalimeSetting") == null)
-      extensionAPI.settings.set("intervalSetting", " - ");
+    if (extensionAPI.settings.get("intervalimeSetting") === null)
+      await extensionAPI.settings.set("intervalSetting", " - ");
     intervalSeparator = extensionAPI.settings.get("intervalSetting");
-    if (extensionAPI.settings.get("durationSetting") == null)
-      extensionAPI.settings.set("durationSetting", "(**<d>'**)");
+    if (extensionAPI.settings.get("durationSetting") === null)
+      await extensionAPI.settings.set("durationSetting", "(**<d>'**)");
     durationFormat = extensionAPI.settings.get("durationSetting");
     splittedDurationFormat = getStringsAroundPlaceHolder(durationFormat, "<d>");
     setDurationRegex();
     if (extensionAPI.settings.get("totalTitleSetting") == null)
-      extensionAPI.settings.set(
+      await extensionAPI.settings.set(
         "totalTitleSetting",
         "Total time [in current <period>::] **<th>**"
       );
     totalTitle = extensionAPI.settings.get("totalTitleSetting");
     if (extensionAPI.settings.get("totalCatSetting") == null)
-      extensionAPI.settings.set(
+      await extensionAPI.settings.set(
         "totalCatSetting",
         "<category>: **<th>** <limit>"
       );
     totalFormat = extensionAPI.settings.get("totalCatSetting");
     if (extensionAPI.settings.get("limitFormatSetting") == null)
-      extensionAPI.settings.set(
+      await extensionAPI.settings.set(
         "limitFormatSetting",
         "<flag> (<type>: <value>')"
       );
     limitFormat = extensionAPI.settings.get("limitFormatSetting");
     if (extensionAPI.settings.get("autoCopyToClipboard") == null)
-      extensionAPI.settings.set("autoCopyToClipboard", true);
+      await extensionAPI.settings.set("autoCopyToClipboard", true);
     autoCopyTotalToClipboard = extensionAPI.settings.get("autoCopyToClipboard");
 
     registerPaletteCommands(extensionAPI);

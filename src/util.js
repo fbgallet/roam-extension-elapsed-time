@@ -1,5 +1,7 @@
 import { durationRegex } from ".";
 
+export const embedRegex =
+  /\{{2}(?:\[\[)?(embed|embed-path|embed-children)(?:\]\])?:\s?\(\(([^\)]{9})\)\)\}{2}/g;
 const limitDurationRegex = /([0-9][0-9]?[0-9]?) ?(h|'|min)([0-9]{1,2})?/i;
 
 const numberRegex =
@@ -22,7 +24,7 @@ export function getTreeByPageTitle(pageTitle) {
 export function getChildrenTree(uid) {
   if (uid) {
     let result = window.roamAlphaAPI.q(`[:find (pull ?page
-      [:block/uid :block/string :block/children :block/order {:block/refs [:block/uid]}
+      [:block/uid :block/string :block/children :block/order {:block/page [:block/uid]} {:block/refs [:block/uid]}
          {:block/children ...} ])
        :where [?page :block/uid "${uid}"]  ]`);
     if (result.length > 0) return result[0][0].children;

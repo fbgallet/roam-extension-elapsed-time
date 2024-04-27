@@ -11,6 +11,7 @@ import {
   displayTotalAsTable,
   includePomodoros,
   categoriesAsRef,
+  includeEmbeds,
 } from ".";
 import { simpleIziMessage } from "./elapsedTime";
 import {
@@ -18,6 +19,7 @@ import {
   convertMinutesTohhmm,
   convertPeriodInNumberOfDays,
   dateIsInPeriod,
+  embedRegex,
   getBlockContent,
   getBlocksIncludingRef,
   getChildrenTree,
@@ -25,6 +27,7 @@ import {
   getCurrentBlockUidOrCreateIt,
   getLastDayOfPreviousPeriod,
   getNbOfDaysFromBlock,
+  getPageNameByPageUid,
   getPageUidByAnyBlockUid,
   getParentUID,
   getQuarter,
@@ -123,8 +126,7 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
         totalPomo.time += pomo;
       }
       if (!time) time = pomo ? pomo : null;
-      //console.log(categoriesRegex);
-      //let matchingWords = [...blockContent.matchAll(categoriesRegex)];
+
       let triggeredCat = [];
       if (tree[i].refs?.length && categoriesAsRef.length) {
         let matchingRefs = getCommonElements(
@@ -162,6 +164,18 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
         }
         processChildren = false;
         total += parseInt(time);
+      }
+      if (includeEmbeds) {
+        const matchingEmbed = embedRegex.exec(blockContent);
+        if (matchingEmbed !== null) {
+          const embedUid = matchingEmbed[2];
+          const embedPageUid = getPageUidByAnyBlockUid(embedUid);
+          if (embedPageUid !== tree[i].page.uid)
+            total += await directChildrenProcess(
+              getChildrenTree(embedUid),
+              catWithoutTime
+            );
+        }
       }
       if (processChildren && tree[i].children) {
         // console.log("parentBlockCat");
@@ -485,15 +499,16 @@ export function getTotalTimeForCurrentPage(triggerUid, pageUid) {
   total += getTotalTimeInTree(getChildrenTree(pageUid));
 
   let references = getBlocksIncludingRef(pageUid);
-  references = references.filter((b) => b[0] != pageUid && b[2] != pageUid);
+  references = references.filter((b) => b[0] !== pageUid && b[2] !== pageUid);
+
   let uidToExclude = references.map((b) => b[0]);
-  references.forEach((ref) => {
-    let time = extractElapsedTime(ref[1]);
+  for (let i = 0; i < references.length; i++) {
+    let time = extractElapsedTime(references[i][1]);
     total += time
       ? time
-      : getTotalTimeInTree(getChildrenTree(ref[0]), uidToExclude);
-  });
-  let totalOutput = getTotalTimeOutput(total);
+      : getTotalTimeInTree(getChildrenTree(references[i][0]), uidToExclude);
+  }
+  let totalOutput = getTotalTimeOutput(total, "page and references", true);
   // console.log(totalOutput);
   let totalUid = prepareTotalTimeInsersion(triggerUid, totalOutput.text);
 }
@@ -547,6 +562,7 @@ function formatDisplayTime(
 ) {
   let t;
   let l = "";
+  console.log("w :>> ", w);
   if (w !== null) {
     t = w.time;
     l = displayLimit(w, period);
@@ -637,7 +653,7 @@ function displayLimit(w, period = "day") {
   return "";
 }
 
-function getTotalTimeOutput(total, period = "day") {
+function getTotalTimeOutput(total, period = "day", simple) {
   let periodToDisplay;
   if (period && isNaN(period)) {
     if (!period.includes("last")) periodToDisplay = `period: ${period}`;
@@ -648,18 +664,19 @@ function getTotalTimeOutput(total, period = "day") {
   //console.log(categoriesArray);
   let totalToBeCalculated = false;
   let displayTotal;
-  //console.log(total);
-  //console.log(periodToDisplay);
+  console.log("total:", total);
+  console.log("periodToDisplay:", periodToDisplay);
   if (total !== 0)
     displayTotal = formatDisplayTime({ time: total }, periodToDisplay, period);
   else totalToBeCalculated = true;
   let totalOutput = new Output(displayTotal);
+  if (simple) return totalOutput;
   let parentCategories = categoriesArray.filter((cat) => !cat.parent);
   parentCategories.forEach((parent) => {
     setCategoryOutput(parent, totalOutput, period);
     total += parent.time;
   });
-  if (uncategorized != 0)
+  if (uncategorized !== 0)
     totalOutput.addChild(
       new Output(
         formatDisplayTime(null, "__Uncategorized__"),
