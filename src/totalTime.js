@@ -86,7 +86,7 @@ export async function totalTime(
     asTable
       ? insertTableOfTotalByCategory(totalOutput, totalUid, "", 0)
       : insertTotalTimeByCategory(totalUid, totalOutput);
-    if (totalOutput.time != 0 && totalOutput.children.length != 0)
+    if (totalOutput.time !== 0 && totalOutput.children.length)
       copyTotalToClipboard();
   }
 }
@@ -187,6 +187,7 @@ function getTriggeredCategoriesFromNames(names, parentBlockCat) {
       // console.log(result);
     }
   }
+  result = removeRedundantCat(result);
   return result;
 }
 
@@ -199,7 +200,7 @@ function getTriggeredCategories(filteredArray) {
       .filter((tw) => filteredArray[0].isParentOf(tw));
     // console.log("child:");
     // console.log(child);
-    if (child.length != 0) {
+    if (child.length !== 0) {
       child = child[0];
       result.push(child);
       filteredArray = filteredArray
@@ -215,9 +216,6 @@ function getTriggeredCategories(filteredArray) {
     result = addOnlySupCatIfSynonym(filteredArray[0], lastName, result);
     filteredArray = filteredArray.slice(1);
   }
-  console.log("result before :>> ", result);
-  result = removeRedundantCat(result);
-  console.log("result after :>> ", result);
   return result;
 }
 
@@ -235,8 +233,7 @@ function removeRedundantCat(catArray) {
       previousArray.some((someCat) => cat.hasSameAncestor(someCat));
     if (!isAncestor && !hasSameAncestor) noRedundantCatArray.push(cat);
   }
-  // noRedundantCatArray.push(catArray.at(-1));
-  console.log("noRedundantCatArray :>> ", noRedundantCatArray);
+  // console.log("noRedundantCatArray :>> ", noRedundantCatArray);
   return noRedundantCatArray;
 }
 
@@ -534,7 +531,7 @@ function formatDisplayTime(
 ) {
   let t;
   let l = "";
-  if (w != null) {
+  if (w !== null) {
     t = w.time;
     l = displayLimit(w, period);
   } else t = uncategorized;
@@ -663,7 +660,7 @@ function getTotalTimeOutput(total, period = "day") {
 }
 
 function setCategoryOutput(category, parentOutput, period = "day") {
-  if (category.time != 0) {
+  if (category.time !== 0) {
     let title;
     if (titleIsRef && category.type === "text") {
       title = "((" + category.uid + "))";
@@ -673,8 +670,9 @@ function setCategoryOutput(category, parentOutput, period = "day") {
     let hideTime =
       displaySubCat &&
       category.children &&
-      category.children.filter((cat) => cat.time != 0).length === 1 &&
-      category.children.filter((cat) => cat.time != 0)[0].time === category.time
+      category.children.filter((cat) => cat.time !== 0).length === 1 &&
+      category.children.filter((cat) => cat.time !== 0)[0].time ===
+        category.time
         ? true
         : false;
     let formatedCatTotal = formatDisplayTime(
@@ -764,7 +762,7 @@ function insertTableOfTotalByCategory(
 ) {
   if (order == 0) {
     //console.log(output.time);
-    let tableComponent = output.time == 0 ? "" : "\n{{table}}";
+    let tableComponent = output.time === 0 ? "" : "\n{{table}}";
     window.roamAlphaAPI.updateBlock({
       block: {
         uid: parentUid,

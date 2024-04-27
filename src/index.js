@@ -138,7 +138,7 @@ class Category {
   // }
   hasSameAncestor(tw) {
     let hasSameAncestor = this.parent?.isAncestorOf(tw);
-    if (!hasSameAncestor && this.parent?.parent?.length)
+    if (!hasSameAncestor && this.parent?.parent)
       hasSameAncestor = this.parent.hasSameAncestor(tw);
     return hasSameAncestor;
   }
