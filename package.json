@@ -1,6 +1,6 @@
 {
   "name": "roam-extension-elapsed-time",
-  "version": "1.0.0",
+  "version": "4.0.0",
   "description": "Easily **track the time spent on your activities and calculate the total daily time spent on them**, organized by categories and sub-categories, and see if predefined **limits or goals** are respected. Helps to implement **interstitial journaling**.",
   "main": "extension.js",
   "dependencies": {

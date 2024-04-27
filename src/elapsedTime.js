@@ -14,7 +14,6 @@ import {
   confirmPopup,
   defaultTimeLimit,
   durationFormat,
-  durationRegex,
   intervalSeparator,
   limitFlag,
   remoteElapsedTime,

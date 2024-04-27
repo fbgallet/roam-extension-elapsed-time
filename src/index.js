@@ -70,7 +70,7 @@ class Category {
     this.name = s.trim();
     this.uid = uid;
     this.display = true;
-    this.type = this.getType(s);
+    this.type = this.getType(s.trim());
     this.limit = { type: "undefined", task: 0, day: 0 };
     this.time = 0;
     this.format = f;
@@ -696,7 +696,7 @@ export default {
           id: "embeds",
           name: "Include embeds",
           description:
-            "Include embeded blocks in total calculation (Unless the original is on the same page):",
+            "Include embedded blocks in total calculation (Unless the original is on the same page):",
           action: {
             type: "switch",
             onChange: () => {

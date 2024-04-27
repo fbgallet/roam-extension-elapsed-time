@@ -27,7 +27,6 @@ import {
   getCurrentBlockUidOrCreateIt,
   getLastDayOfPreviousPeriod,
   getNbOfDaysFromBlock,
-  getPageNameByPageUid,
   getPageUidByAnyBlockUid,
   getParentUID,
   getQuarter,
@@ -44,8 +43,8 @@ const totalPomo = {
   nb: 0,
   time: 0,
 };
-var titleIsRef = true; // Trigger words are inserted as block references in Total display
-var uncategorized;
+let titleIsRef = true; // Trigger words are inserted as block references in Total display
+let uncategorized;
 let outputForClipboard;
 
 /*========================================================================*/
@@ -377,7 +376,7 @@ class DayLog {
   }
 }
 
-export var mainDailyLog;
+export let mainDailyLog;
 
 export async function totalTimeForGivenPeriod(
   period,
@@ -447,7 +446,7 @@ async function getPreviousDailyLogs(today, period) {
     if (period.includes("last ")) {
       period = period.replace("last ", "");
       today = getLastDayOfPreviousPeriod(today, period);
-      console.log("last day of previous period", today);
+      // console.log("last day of previous period", today);
     }
     limitedNb = true;
     nbOfDays = convertPeriodInNumberOfDays(period);
@@ -562,7 +561,6 @@ function formatDisplayTime(
 ) {
   let t;
   let l = "";
-  console.log("w :>> ", w);
   if (w !== null) {
     t = w.time;
     l = displayLimit(w, period);
@@ -664,8 +662,6 @@ function getTotalTimeOutput(total, period = "day", simple) {
   //console.log(categoriesArray);
   let totalToBeCalculated = false;
   let displayTotal;
-  console.log("total:", total);
-  console.log("periodToDisplay:", periodToDisplay);
   if (total !== 0)
     displayTotal = formatDisplayTime({ time: total }, periodToDisplay, period);
   else totalToBeCalculated = true;
