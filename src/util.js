@@ -22,7 +22,7 @@ export function getTreeByPageTitle(pageTitle) {
 export function getChildrenTree(uid) {
   if (uid) {
     let result = window.roamAlphaAPI.q(`[:find (pull ?page
-      [:block/uid :block/string :block/children :block/order 
+      [:block/uid :block/string :block/children :block/order {:block/refs [:block/uid]}
          {:block/children ...} ])
        :where [?page :block/uid "${uid}"]  ]`);
     if (result.length > 0) return result[0][0].children;
@@ -69,6 +69,23 @@ export function getBlocksUidReferencedInThisBlock(uid) {
               [?r :block/refs ?x] 
               [?x :block/uid ?u] ]`;
   return window.roamAlphaAPI.q(q).flat();
+}
+
+export function getPageNameByPageUid(uid) {
+  let r = window.roamAlphaAPI.data.pull("[:node/title]", [":block/uid", uid]);
+  if (r != null) return r[":node/title"];
+  else return "undefined";
+}
+
+export function getLonguestPageTitleFromUids(uids) {
+  const longestPageTitleUid = uids.reduce((longestUid, currentUid) => {
+    const longestPageTitle = getPageNameByPageUid(longestUid);
+    const currentPageTitle = getPageNameByPageUid(currentUid);
+    return currentPageTitle.length > longestPageTitle.length
+      ? currentUid
+      : longestUid;
+  }, "");
+  return longestPageTitleUid;
 }
 
 export async function getMainPageUid() {
@@ -470,29 +487,11 @@ function convertAlphabeticNumberToValue(number) {
   }
 }
 
-export function extractDelimitedNumberFromString(blockContent, before, after) {
-  let number;
+export function extractDelimitedNumberFromString(blockContent) {
   let match = blockContent.match(durationRegex);
   if (match) {
     return match[1];
   }
-  // if (blockContent.includes(after)) {
-  //   let leftPart = blockContent.split(after)[0];
-  //   if (leftPart.length > 0) {
-  //     let splitted = leftPart.split(before);
-  //     let length = splitted.length;
-  //     if (length > 0) {
-  //       let n = splitted[length - 1];
-  //       if (!isNaN(n) && n != "") {
-  //         number = parseInt(n);
-  //         return number;
-  //       }
-  //       if (isNaN(number)) {
-  //         return "NaN";
-  //       }
-  //     }
-  //   }
-  // }
   return -1;
 }
 
@@ -526,4 +525,8 @@ export function sumOfArrayElements(array) {
     s += array[i];
   }
   return s;
+}
+
+export function getCommonElements(arr1, arr2) {
+  return arr1.filter((elt) => arr2.includes(elt));
 }

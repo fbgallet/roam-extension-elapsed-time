@@ -10,6 +10,7 @@ import {
   autoCopyTotalToClipboard,
   displayTotalAsTable,
   includePomodoros,
+  categoriesAsRef,
 } from ".";
 import { simpleIziMessage } from "./elapsedTime";
 import {
@@ -20,6 +21,7 @@ import {
   getBlockContent,
   getBlocksIncludingRef,
   getChildrenTree,
+  getCommonElements,
   getCurrentBlockUidOrCreateIt,
   getLastDayOfPreviousPeriod,
   getNbOfDaysFromBlock,
@@ -107,11 +109,10 @@ function resetTotalTimes() {
 }
 
 async function directChildrenProcess(tree, parentBlockCat = null) {
-  //console.log(categoriesArray);
   let total = 0;
   if (tree) {
-    let length = tree.length;
-    for (let i = 0; i < length; i++) {
+    for (let i = 0; i < tree.length; i++) {
+      let catWithoutTime = null;
       let processChildren = true;
       let blockContent = tree[i].string;
       //console.log(blockContent);
@@ -124,11 +125,23 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
       if (!time) time = pomo ? pomo : null;
       //console.log(categoriesRegex);
       //let matchingWords = [...blockContent.matchAll(categoriesRegex)];
+      let triggeredCat = [];
+      if (tree[i].refs?.length && categoriesAsRef.length) {
+        let matchingRefs = getCommonElements(
+          tree[i].refs.map((ref) => ref.uid),
+          categoriesAsRef
+        );
+        // console.log("matchingRefs :>> ", matchingRefs);
+        if (matchingRefs.length)
+          triggeredCat = triggeredCat.concat(
+            categoriesArray.filter(
+              (cat) => cat.ref && matchingRefs.includes(cat.ref)
+            )
+          );
+        // console.log("triggeredCat :>> ", triggeredCat);
+      }
       let matchingWords = blockContent.match(categoriesRegex);
-      let triggeredCat;
       if (matchingWords) {
-        console.log("categoriesArray :>> ", categoriesArray);
-        console.log("matchingWords", matchingWords);
         triggeredCat = getTriggeredCategoriesFromNames(
           matchingWords,
           parentBlockCat
@@ -138,13 +151,14 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
         if (!hasElapsedTimeInChildren(tree[i].children)) {
           processChildren = false;
         }
-        parentBlockCat = triggeredCat ? triggeredCat[0] : parentBlockCat;
+        catWithoutTime = triggeredCat.length ? triggeredCat[0] : parentBlockCat;
       } else {
         //  time = parseInt(time);
-        if (triggeredCat) triggeredCat.forEach((cat) => cat.addTime(time));
+        if (triggeredCat.length)
+          triggeredCat.forEach((cat) => cat.addTime(time));
         else {
           if (parentBlockCat) parentBlockCat.addTime(time);
-          else uncategorized += time;
+          else uncategorized += parseInt(time);
         }
         processChildren = false;
         total += parseInt(time);
@@ -152,7 +166,7 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
       if (processChildren && tree[i].children) {
         // console.log("parentBlockCat");
         // console.log(parentBlockCat);
-        total += await directChildrenProcess(tree[i].children, parentBlockCat);
+        total += await directChildrenProcess(tree[i].children, catWithoutTime);
       }
     }
   }
@@ -167,9 +181,10 @@ function getTriggeredCategoriesFromNames(names, parentBlockCat) {
     // console.log(child);
     if (child) {
       result.push(parentBlockCat.getChildrenWithName(child));
-      names = names.filter((name) => name != child);
+      names = names.filter((name) => name !== child);
     }
   }
+  // console.log("names :>> ", names);
   if (names.length > 0) {
     let catAndPossiblesCat = [].concat(
       ...names.map((name) => {
@@ -187,6 +202,7 @@ function getTriggeredCategoriesFromNames(names, parentBlockCat) {
       // console.log(result);
     }
   }
+  // console.log("result before :>> ", result);
   result = removeRedundantCat(result);
   return result;
 }
@@ -227,10 +243,10 @@ function removeRedundantCat(catArray) {
     let isAncestor =
       remainingArray.length &&
       remainingArray.some((someCat) => cat.isAncestorOf(someCat));
-    const previousArray = catArray.slice(0, i);
+    // const previousArray = catArray.slice(0, i);
     let hasSameAncestor =
-      previousArray.length &&
-      previousArray.some((someCat) => cat.hasSameAncestor(someCat));
+      noRedundantCatArray.length &&
+      noRedundantCatArray.some((someCat) => cat.hasSameAncestor(someCat));
     if (!isAncestor && !hasSameAncestor) noRedundantCatArray.push(cat);
   }
   // console.log("noRedundantCatArray :>> ", noRedundantCatArray);
@@ -478,7 +494,7 @@ export function getTotalTimeForCurrentPage(triggerUid, pageUid) {
       : getTotalTimeInTree(getChildrenTree(ref[0]), uidToExclude);
   });
   let totalOutput = getTotalTimeOutput(total);
-  console.log(totalOutput);
+  // console.log(totalOutput);
   let totalUid = prepareTotalTimeInsersion(triggerUid, totalOutput.text);
 }
 
@@ -666,6 +682,8 @@ function setCategoryOutput(category, parentOutput, period = "day") {
       title = "((" + category.uid + "))";
     } else {
       title = category.name;
+      // space needed to not insert ':' in the tag name
+      if (category.type === "pageRef") title += " ";
     }
     let hideTime =
       displaySubCat &&
@@ -798,7 +816,10 @@ function insertTableOfTotalByCategory(
 
 function copyTotalToClipboard() {
   if (autoCopyTotalToClipboard) {
-    getListOfTotalByCategory(categoriesArray.filter((cat) => !cat.parent));
+    const filteredCatArray = categoriesArray.filter((cat) => !cat.parent);
+    if (uncategorized)
+      filteredCatArray.push({ name: "Uncategorized", time: uncategorized });
+    getListOfTotalByCategory(filteredCatArray);
     navigator.clipboard.writeText(outputForClipboard);
     simpleIziMessage(
       "Total times copied to clipboard in a simple table, easy to export."

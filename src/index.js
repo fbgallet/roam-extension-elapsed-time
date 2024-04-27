@@ -17,6 +17,7 @@ import {
   getBlockAttributes,
   getChildrenTree,
   getCurrentBlockUidOrCreateIt,
+  getLonguestPageTitleFromUids,
   getPageUidByAnyBlockUid,
   getRegexFromArray,
   getStringsAroundPlaceHolder,
@@ -25,8 +26,8 @@ import {
 } from "./util";
 
 /************************* PANEL SETTINGS VAR **************************/
-var categoriesUID, limitsUID, flagsDropdown, customFlags;
-export var confirmPopup,
+let categoriesUID, limitsUID, flagsDropdown, customFlags;
+export let confirmPopup,
   displaySubCat,
   limitFlag,
   defaultTimeLimit,
@@ -58,12 +59,13 @@ const TYPE = {
   blockRef: "blockRef",
 };
 
-export var categoriesArray = [];
-export var categoriesNames = [];
-export var categoriesRegex;
+export let categoriesArray = [];
+export let categoriesNames = [];
+export let categoriesAsRef = [];
+export let categoriesRegex;
 
 class Category {
-  constructor(s, uid, l, f, parent = null) {
+  constructor(s, uid, refs, f, parent = null) {
     this.name = s;
     this.uid = uid;
     this.display = true;
@@ -73,9 +75,16 @@ class Category {
     this.format = f;
     this.children = [];
     this.parent = parent;
+    this.ref =
+      this.type === "pageRef"
+        ? refs.length === 1
+          ? refs[0]["uid"]
+          : // in case of nested page title, get the longest (wrapping the other)
+            getLonguestPageTitleFromUids(refs.map((ref) => ref.uid))
+        : null;
   }
-  addChildren(s, u, l, f) {
-    return this.children.push(new Category(s, u, l, f));
+  addChildren(s, u, r, f) {
+    return this.children.push(new Category(s, u, r, f));
   }
   getOnlyWord(s) {
     s = s.split("{")[0];
@@ -87,9 +96,9 @@ class Category {
   }
   getType(name) {
     const uidRegex = /^\(\([^\)]{9}\)\)$/g;
-    const pageRegex = /^\[\[.*\]\]$/g; // very simplified, not recursive...
+    const pageOrTagRegex = /^#?(\[\[.*\]\])$|^#[^\s]+$/g;
     if (uidRegex.test(name)) return TYPE.blockRef;
-    if (pageRegex.test(name)) return TYPE.pageRef;
+    if (pageOrTagRegex.test(name)) return TYPE.pageRef;
     else return TYPE.text;
   }
   setLimit(type, interval, time) {
@@ -167,6 +176,7 @@ function getParameters() {
     default:
       limitFlag = getLimitFlags("Icons");
   }
+  console.log("categories:", categoriesArray);
 }
 
 export function scanCategories(s, refs, callBack, once) {
@@ -211,6 +221,8 @@ export function getCategories(parentUid) {
   categoriesNames.length = 0;
   let triggerTree = parentUid ? getChildrenTree(parentUid) : null;
 
+  // console.log("triggerTree :>> ", triggerTree);
+
   if (triggerTree) {
     for (let i = 0; i < triggerTree.length; i++) {
       let w = triggerTree[i];
@@ -219,21 +231,27 @@ export function getCategories(parentUid) {
         hide = true;
         w.string = w.string.replace("{hide}", "");
       }
-      let topTrigger = new Category(w.string, w.uid, null, "");
+      let topTrigger = new Category(w.string, w.uid, w.refs, "");
       categoriesArray.push(topTrigger);
       if (w.children) {
         getSubCategories(w.children, topTrigger, hide);
       }
     }
-    categoriesNames = categoriesArray.map((trigger) => trigger.name);
+    categoriesNames = categoriesArray
+      .filter((cat) => cat.type !== "pageRef")
+      .map((cat) => cat.name);
     categoriesRegex = getRegexFromArray(categoriesNames);
+    categoriesAsRef = categoriesArray
+      .filter((cat) => cat.type === "pageRef")
+      .map((cat) => cat.ref);
   } else {
     categoriesArray.length = 0;
     categoriesNames.length = 0;
     categoriesRegex = null;
   }
-  //console.log(categoriesArray);
-  //console.log(categoriesNames);
+  // console.log("categories:", categoriesArray);
+  // console.log(categoriesNames);
+  // console.log(categoriesAsRef);
 
   function getSubCategories(tree, topTrigger, hideTop) {
     for (let j = 0; j < tree.length; j++) {
@@ -245,7 +263,13 @@ export function getCategories(parentUid) {
       }
       let format = "";
       //supTrigger.addChildren(t, w.children[j].uid, "", format);
-      let subTrigger = new Category(t, tree[j].uid, "", format, topTrigger);
+      let subTrigger = new Category(
+        t,
+        tree[j].uid,
+        tree[j].refs,
+        format,
+        topTrigger
+      );
       topTrigger.children.push(subTrigger);
       categoriesArray.push(subTrigger);
       if (hideTop || hideSub) {
@@ -268,7 +292,7 @@ export function getLimits(uid) {
       }
     });
   } else resetLimits();
-  console.log(categoriesArray);
+  // console.log(categoriesArray);
 }
 
 function resetLimits() {
