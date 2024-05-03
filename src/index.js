@@ -6,6 +6,7 @@ import {
 } from "./data";
 import { elapsedTime, simpleIziMessage } from "./elapsedTime";
 import {
+  getTotalTimeForCurrentNode,
   getTotalTimeForCurrentPage,
   totalTime,
   totalTimeForGivenPeriod,
@@ -13,11 +14,13 @@ import {
 import {
   addPullWatch,
   convertStringDurationToMinutes,
+  createBlock,
   escapeCharacters,
   getBlockAttributes,
   getChildrenTree,
   getCurrentBlockUidOrCreateIt,
   getLonguestPageTitleFromUids,
+  getMainPageUid,
   getPageUidByAnyBlockUid,
   getRegexFromArray,
   getStringsAroundPlaceHolder,
@@ -462,12 +465,22 @@ function registerPaletteCommands(extensionAPI) {
   });
   extensionAPI.ui.commandPalette.addCommand({
     label: "Time Tracker: Total for current page and all its references",
+    callback: async () => {
+      let startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
+      let scopeUid;
+      if (!startUid) {
+        scopeUid = await getMainPageUid();
+        startUid = await createBlock(scopeUid, "", true);
+      } else scopeUid = getPageUidByAnyBlockUid(startUid);
+      getTotalTimeForCurrentNode(startUid, scopeUid, "page");
+    },
+  });
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Time Tracker: Total for current block and all its references",
     callback: () => {
       let startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
-      // setTimeout(() => {
-      let scopeUid = getPageUidByAnyBlockUid(startUid);
-      getTotalTimeForCurrentPage(startUid, scopeUid);
-      // }, 50);
+      if (!startUid) return;
+      getTotalTimeForCurrentNode(startUid, startUid, "block");
     },
   });
 

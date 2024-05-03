@@ -18,6 +18,7 @@ import {
   convertMinutesToDecimals,
   convertMinutesTohhmm,
   convertPeriodInNumberOfDays,
+  createBlock,
   dateIsInPeriod,
   embedRegex,
   getBlockContent,
@@ -168,8 +169,8 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
         const matchingEmbed = embedRegex.exec(blockContent);
         if (matchingEmbed !== null) {
           const embedUid = matchingEmbed[2];
-          const embedPageUid = getPageUidByAnyBlockUid(embedUid);
-          if (embedPageUid !== tree[i].page.uid)
+          const embednodeUid = getPageUidByAnyBlockUid(embedUid);
+          if (embednodeUid !== tree[i].page.uid)
             total += await directChildrenProcess(
               getChildrenTree(embedUid),
               catWithoutTime
@@ -402,8 +403,8 @@ export async function getTotalTimeFromPreviousDays(
   resetTotalTimes();
   let dnpUidArray = [];
   if (today === null) {
-    let pageUid = getPageUidByAnyBlockUid(currentBlockUid);
-    let parsedTitle = Date.parse(pageUid);
+    let nodeUid = getPageUidByAnyBlockUid(currentBlockUid);
+    let parsedTitle = Date.parse(nodeUid);
     isNaN(parsedTitle) ? (today = new Date()) : (today = new Date(parsedTitle));
   }
   dnpUidArray = await getPreviousDailyLogs(today, period);
@@ -470,12 +471,12 @@ async function getPreviousDailyLogs(today, period) {
     nbOfDays = period;
   }
   let dnpUidArray = [];
-  dnpUidArray.push(window.roamAlphaAPI.util.dateToPageUid(today));
+  dnpUidArray.push(window.roamAlphaAPI.util.dateTonodeUid(today));
   let yesterday;
   for (let i = limitedNb ? 0 : 1; i < nbOfDays; i++) {
     yesterday = getYesterdayDate(today);
     if (limitedNb && !dateIsInPeriod(yesterday, period, dateFlag)) break;
-    let uid = window.roamAlphaAPI.util.dateToPageUid(yesterday);
+    let uid = window.roamAlphaAPI.util.dateTonodeUid(yesterday);
     dnpUidArray.push(uid);
     today = yesterday;
   }
@@ -490,26 +491,37 @@ export async function getTotaTimeInDailyLog(dayLog) {
 }
 
 /*========================================================================*/
-// TOTAL TIME FOR A GIVEN PAGE REFERENCE IN WHOLE GRAPH
+// TOTAL TIME FOR A GIVEN PAGE REFERENCE OR BLOCK REFERENCE IN WHOLE GRAPH
 /*========================================================================*/
 
-export function getTotalTimeForCurrentPage(triggerUid, pageUid) {
+export async function getTotalTimeForCurrentNode(
+  triggerUid,
+  nodeUid,
+  nodeType = "page"
+) {
   let total = 0;
-  total += getTotalTimeInTree(getChildrenTree(pageUid));
+  total += getTotalTimeInTree(getChildrenTree(nodeUid));
 
-  let references = getBlocksIncludingRef(pageUid);
-  references = references.filter((b) => b[0] !== pageUid && b[2] !== pageUid);
+  let references = getBlocksIncludingRef(nodeUid);
+  references = references.filter((b) => b[0] !== nodeUid && b[2] !== nodeUid);
 
-  let uidToExclude = references.map((b) => b[0]);
+  let uidToExclude = nodeType === "page" ? references.map((b) => b[0]) : [];
   for (let i = 0; i < references.length; i++) {
     let time = extractElapsedTime(references[i][1]);
     total += time
       ? time
       : getTotalTimeInTree(getChildrenTree(references[i][0]), uidToExclude);
   }
-  let totalOutput = getTotalTimeOutput(total, "page and references", true);
-  // console.log(totalOutput);
-  let totalUid = prepareTotalTimeInsersion(triggerUid, totalOutput.text);
+  let totalOutput = getTotalTimeOutput(
+    total,
+    nodeType === "page" ? "page and references" : "block and references",
+    true
+  );
+  console.log("totalOutput:", totalOutput);
+  if (nodeType === "block") {
+    triggerUid = await createBlock(triggerUid, "", true);
+  }
+  prepareTotalTimeInsersion(triggerUid, totalOutput.text);
 }
 
 function extractElapsedTime(content) {
@@ -662,7 +674,7 @@ function getTotalTimeOutput(total, period = "day", simple) {
   //console.log(categoriesArray);
   let totalToBeCalculated = false;
   let displayTotal;
-  if (total !== 0)
+  if (total !== 0 || simple)
     displayTotal = formatDisplayTime({ time: total }, periodToDisplay, period);
   else totalToBeCalculated = true;
   let totalOutput = new Output(displayTotal);
