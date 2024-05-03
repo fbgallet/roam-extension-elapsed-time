@@ -1,8 +1,9 @@
-## v.4 (April 27th, 2024) important fixes
+## v.4 (May 3rd, 2024) important fixes
 
 ### New feature:
 
 - embeded blocks can now be taken into account (in option)
+- new command: "Total for current block and all its references"
 
 ### Updates:
 
@@ -13,6 +14,7 @@
 
 - Total was not reliable when multiple sub-categories were mentionned in the same block or hierachy (time could be added multiple times to the higher sub-total).
 - Decimals are rounded to 2 and properly displayed in tables
+- Small bugs in the display of total for current page and its refs (was not working if no block focused, and total=0 was not displayed)
 
 ## v.3 (August 23rd, 2023) small add-ons
 
