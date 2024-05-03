@@ -48,6 +48,7 @@ Total can be calculated in different range of data or periods, depending on the 
   - if the command is executed in a block with children, the calculation will be done on all children and their children,
   - otherwise, it will concern the sibbling blocks and their children.
 - `total for current page and all its references`: if you don't need to include references of the current page, use the previous command. This command browses all linked references of the current page, not only those that directly contain an elapsed time, but also those that could contain it in their children (experimental, may not be always accurate).
+- 🆕 New in v.4 `total for current page and all its references`: browses all children and all linked references of the focused block, not only those that directly contain an elapsed time, but also those that could contain it in their children (warning: a given elapsed time can be added twice if it's a children of another linked reference of the same block)
 
 For any of these commands,
 
