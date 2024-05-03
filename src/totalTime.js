@@ -169,8 +169,8 @@ async function directChildrenProcess(tree, parentBlockCat = null) {
         const matchingEmbed = embedRegex.exec(blockContent);
         if (matchingEmbed !== null) {
           const embedUid = matchingEmbed[2];
-          const embednodeUid = getPageUidByAnyBlockUid(embedUid);
-          if (embednodeUid !== tree[i].page.uid)
+          const embedPageUid = getPageUidByAnyBlockUid(embedUid);
+          if (embedPageUid !== tree[i].page.uid)
             total += await directChildrenProcess(
               getChildrenTree(embedUid),
               catWithoutTime
@@ -403,8 +403,8 @@ export async function getTotalTimeFromPreviousDays(
   resetTotalTimes();
   let dnpUidArray = [];
   if (today === null) {
-    let nodeUid = getPageUidByAnyBlockUid(currentBlockUid);
-    let parsedTitle = Date.parse(nodeUid);
+    let pageUid = getPageUidByAnyBlockUid(currentBlockUid);
+    let parsedTitle = Date.parse(pageUid);
     isNaN(parsedTitle) ? (today = new Date()) : (today = new Date(parsedTitle));
   }
   dnpUidArray = await getPreviousDailyLogs(today, period);
@@ -471,12 +471,12 @@ async function getPreviousDailyLogs(today, period) {
     nbOfDays = period;
   }
   let dnpUidArray = [];
-  dnpUidArray.push(window.roamAlphaAPI.util.dateTonodeUid(today));
+  dnpUidArray.push(window.roamAlphaAPI.util.dateToPageUid(today));
   let yesterday;
   for (let i = limitedNb ? 0 : 1; i < nbOfDays; i++) {
     yesterday = getYesterdayDate(today);
     if (limitedNb && !dateIsInPeriod(yesterday, period, dateFlag)) break;
-    let uid = window.roamAlphaAPI.util.dateTonodeUid(yesterday);
+    let uid = window.roamAlphaAPI.util.dateToPageUid(yesterday);
     dnpUidArray.push(uid);
     today = yesterday;
   }
