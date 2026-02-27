@@ -1,11 +1,11 @@
 import { durationRegex } from ".";
 
 export const embedRegex =
-  /\{{2}(?:\[\[)?(embed|embed-path|embed-children)(?:\]\])?:\s?\(\(([^\)]{9})\)\)\}{2}/g;
+  /\{{2}(?:\[\[)?(embed|embed-path|embed-children)(?:\]\])?:\s?\(\(([^\)]{9})\)\)\}{2}/;
 const limitDurationRegex = /([0-9][0-9]?[0-9]?) ?(h|'|min)([0-9]{1,2})?/i;
 
 const numberRegex =
-  /\d+|one|two|three|for|five|six|seven|height|nine|ten|eleven|twelve|thirteen|fourteen|fithteen|twenty|thirty|forty|fithty|sixty|hundred/;
+  /\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|twenty|thirty|forty|fifty|sixty|hundred/;
 const periodRegex =
   /day|week|month|quarter|year|jour|semaine|mois|trimestre|année/;
 const pastAdjectiveRegex =
@@ -218,26 +218,29 @@ export async function getCurrentBlockUidOrCreateIt() {
   return uid;
 }
 
+const pullWatchCallbacks = new Map();
+
 export function addPullWatch(uid, callback) {
   console.log("Pullwatch on " + uid);
+  const wrapper = () => callback(uid);
+  pullWatchCallbacks.set(uid + callback.name, wrapper);
   window.roamAlphaAPI.data.addPullWatch(
     "[:block/children :block/string {:block/children ...}]",
     `[:block/uid "${uid}"]`,
-    function a(before, after) {
-      //console.log("after", after);
-      callback(uid);
-    }
+    wrapper
   );
 }
 export function removePullWatch(uid, callback) {
   console.log("Removed pullwatch");
+  const key = uid + callback.name;
+  const wrapper = pullWatchCallbacks.get(key);
+  if (!wrapper) return;
   window.roamAlphaAPI.data.removePullWatch(
     "[:block/children :block/string {:block/children ...}]",
     `[:block/uid "${uid}"]`,
-    function a(before, after) {
-      callback(uid);
-    }
+    wrapper
   );
+  pullWatchCallbacks.delete(key);
 }
 
 export function normalizeUID(uid) {
@@ -407,7 +410,7 @@ function getLastDayOfPreviousQuarter(day) {
 }
 
 function getLastDayOfPreviousYear(day) {
-  return new Date(day.getFullYear() - 1, 12, 31);
+  return new Date(day.getFullYear() - 1, 11, 31);
 }
 
 export function getLastDayOfPreviousPeriod(today, period) {
@@ -478,7 +481,7 @@ function convertAlphabeticNumberToValue(number) {
       return 30;
     case "forty":
       return 40;
-    case "fithty":
+    case "fifty":
       return 50;
     case "sixty":
       return 60;
@@ -489,7 +492,7 @@ function convertAlphabeticNumberToValue(number) {
   }
 }
 
-export function extractDelimitedNumberFromString(blockContent) {
+export function extractDelimitedNumberFromString(blockContent, _left, _right) {
   let match = blockContent.match(durationRegex);
   if (match) {
     return match[1];
@@ -503,12 +506,6 @@ export function getStringsAroundPlaceHolder(string, placeholder) {
   let right;
   split.length > 1 ? (right = split[1]) : (right = "");
   return [left, right];
-}
-
-export function getSingleRegexFromArray(arr) {
-  const regexStr = arr.join("");
-  const regex = new RegExp(`${regexStr}`, "g");
-  return regex;
 }
 
 export function getRegexFromArray(arr) {

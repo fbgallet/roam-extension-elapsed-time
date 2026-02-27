@@ -672,17 +672,15 @@ function getTotalTimeOutput(total, period = "day", simple) {
     periodToDisplay = "period: since " + period + " days";
   else periodToDisplay = "";
   //console.log(categoriesArray);
-  let totalToBeCalculated = false;
-  let displayTotal;
-  if (total !== 0 || simple)
-    displayTotal = formatDisplayTime({ time: total }, periodToDisplay, period);
-  else totalToBeCalculated = true;
-  let totalOutput = new Output(displayTotal);
-  if (simple) return totalOutput;
+  let totalOutput = new Output(null);
+  if (simple) {
+    totalOutput.text = formatDisplayTime({ time: total }, periodToDisplay, period);
+    totalOutput.time = total;
+    return totalOutput;
+  }
   let parentCategories = categoriesArray.filter((cat) => !cat.parent);
   parentCategories.forEach((parent) => {
     setCategoryOutput(parent, totalOutput, period);
-    total += parent.time;
   });
   if (uncategorized !== 0)
     totalOutput.addChild(
@@ -692,9 +690,12 @@ function getTotalTimeOutput(total, period = "day", simple) {
         uncategorized
       )
     );
-  total += uncategorized;
-  if (totalToBeCalculated)
-    displayTotal = formatDisplayTime({ time: total }, periodToDisplay, period);
+  // If total was not provided (period aggregation), sum from categories + uncategorized
+  if (total === 0) {
+    total =
+      parentCategories.reduce((sum, cat) => sum + cat.time, 0) + uncategorized;
+  }
+  let displayTotal = formatDisplayTime({ time: total }, periodToDisplay, period);
   totalOutput.time = total;
   totalOutput.text = displayTotal;
   return totalOutput;

@@ -390,7 +390,7 @@ function extractLimit(s, shift) {
     t += s.charAt(i + shift);
     i++;
   }
-  return t;
+  return parseInt(t) || 0;
 }
 
 export function simpleIziMessage(message, color = "blue") {

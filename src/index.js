@@ -140,15 +140,6 @@ class Category {
     }
     return isAncestor;
   }
-  // isDescendantOf(tw) {
-  //   let isDescendant = this.hasChildrenWithName(tw.name);
-  //   if (!isDescendant) {
-  //     isDescendant =
-  //       this.children.length &&
-  //       this.children.some((child) => child.isAncestorOf(tw));
-  //   }
-  //   return isAncestor;
-  // }
   hasSameAncestor(tw) {
     let hasSameAncestor = this.parent?.isAncestorOf(tw);
     if (!hasSameAncestor && this.parent?.parent)
@@ -180,7 +171,6 @@ function getParameters() {
     default:
       limitFlag = getLimitFlags("Icons");
   }
-  console.log("categories:", categoriesArray);
 }
 
 export function scanCategories(s, refs, callBack, once) {
@@ -188,14 +178,16 @@ export function scanCategories(s, refs, callBack, once) {
   let hasCat = false;
   let tag = "";
   s = s.toLowerCase();
-  categoriesArray.forEach((cat, i) => {
+  for (let i = 0; i < categoriesArray.length; i++) {
+    const cat = categoriesArray[i];
     if (refs.includes(cat.uid) || s.includes(cat.name.toLowerCase())) {
       result = callBack(cat, i, -1, result);
       hasCat = true;
       if (once) return result;
     }
     if (cat.children) {
-      cat.children.forEach((subCat, j) => {
+      for (let j = 0; j < cat.children.length; j++) {
+        const subCat = cat.children[j];
         if (
           refs.includes(subCat.uid) ||
           s.includes(subCat.name.toLowerCase())
@@ -212,10 +204,10 @@ export function scanCategories(s, refs, callBack, once) {
           if (once) return result;
           tag = subCat.name.toLowerCase();
         }
-      });
+      }
       hasCat = false;
     }
-  });
+  }
   if (result.length == 0) return callBack(null, -1, -1);
   return result;
 }
@@ -329,7 +321,6 @@ function getLimitsByTypeAndInterval(type, interval, tree) {
         let duration = limitDuration.string
           ? convertStringDurationToMinutes(limitDuration.string)
           : undefined;
-        limitDuration.string.replace(/[^0-9]+/g, "");
         if (!isNaN(duration)) {
           limitDuration.children.forEach((catRef) => {
             let tw = categoriesArray.find(
@@ -942,7 +933,7 @@ export default {
     if (extensionAPI.settings.get("defaultTimeSetting") === null)
       await extensionAPI.settings.set("defaultTimeSetting", 90);
     defaultTimeLimit = extensionAPI.settings.get("defaultTimeSetting");
-    if (extensionAPI.settings.get("intervalimeSetting") === null)
+    if (extensionAPI.settings.get("intervalSetting") === null)
       await extensionAPI.settings.set("intervalSetting", " - ");
     intervalSeparator = extensionAPI.settings.get("intervalSetting");
     if (extensionAPI.settings.get("durationSetting") === null)
