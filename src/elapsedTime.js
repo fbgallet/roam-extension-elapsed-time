@@ -1,5 +1,5 @@
-import iziToast from "izitoast";
-import "../node_modules/izitoast/dist/css/iziToast.css";
+import { Intent } from "@blueprintjs/core";
+import { confirmTimingPopup } from "./notify";
 import {
   addZero,
   extractDelimitedNumberFromString,
@@ -17,9 +17,9 @@ import {
   intervalSeparator,
   limitFlag,
   remoteElapsedTime,
-  scanCategories,
 } from ".";
-import { getDifferenceWithLimit } from "./totalTime";
+import { scanCategories } from "./categories";
+import { getDifferenceWithLimit } from "./display";
 
 /*======================================================================================================*/
 /* ELAPSED TIME SB */
@@ -244,34 +244,14 @@ function compareToLimitsAndUpdate(
         buttonCaption = "Not enough anyway!";
       }
       if (confirmPopup) {
-        buttonCaption = "<button>" + buttonCaption + "</button>";
-        iziToast.success({
-          timeout: 6000,
-          displayMode: "replace",
-          id: "timing",
-          zindex: 999,
+        confirmTimingPopup({
           title: textTitle,
           message: textMessage,
-          position: "bottomCenter",
-          drag: false,
-          close: true,
-          buttons: [
-            [
-              "<button>Great!</button>",
-              async (instance, toast) => {
-                updateBlock(blockUID, leftPart + goodFormat + " " + rightPart);
-                instance.hide({ transitionOut: "fadeOut" }, toast, "button");
-              },
-              true,
-            ],
-            [
-              buttonCaption,
-              async (instance, toast) => {
-                updateBlock(blockUID, leftPart + badFormat + " " + rightPart);
-                instance.hide({ transitionOut: "fadeOut" }, toast, "button");
-              },
-            ],
-          ],
+          goodLabel: "Great!",
+          badLabel: buttonCaption,
+          onGood: () => updateBlock(blockUID, leftPart + goodFormat + " " + rightPart),
+          onBad: () => updateBlock(blockUID, leftPart + badFormat + " " + rightPart),
+          intent: Intent.SUCCESS,
         });
       }
     } else {
@@ -323,34 +303,14 @@ function compareToLimitsAndUpdate(
       }
 
       if (confirmPopup) {
-        buttonCaption = "<button>" + buttonCaption + "</button>";
-        iziToast.warning({
-          timeout: 6000,
-          displayMode: "replace",
-          id: "timing",
-          zindex: 999,
+        confirmTimingPopup({
           title: textTitle,
           message: textMessage,
-          position: "bottomCenter",
-          drag: false,
-          close: true,
-          buttons: [
-            [
-              "<button>Good anyway!</button>",
-              async (instance, toast) => {
-                updateBlock(blockUID, leftPart + goodFormat + " " + rightPart);
-                instance.hide({ transitionOut: "fadeOut" }, toast, "button");
-              },
-            ],
-            [
-              buttonCaption,
-              async (instance, toast) => {
-                updateBlock(blockUID, leftPart + badFormat + " " + rightPart);
-                instance.hide({ transitionOut: "fadeOut" }, toast, "button");
-              },
-              true,
-            ],
-          ],
+          goodLabel: "Good anyway!",
+          badLabel: buttonCaption,
+          onGood: () => updateBlock(blockUID, leftPart + goodFormat + " " + rightPart),
+          onBad: () => updateBlock(blockUID, leftPart + badFormat + " " + rightPart),
+          intent: Intent.WARNING,
         });
       } else leftPart = leftPart + badFormat;
     }
@@ -393,16 +353,3 @@ function extractLimit(s, shift) {
   return parseInt(t) || 0;
 }
 
-export function simpleIziMessage(message, color = "blue") {
-  iziToast.info({
-    timeout: 8000,
-    displayMode: "replace",
-    id: "timing",
-    zindex: 999,
-    color: color,
-    maxWidth: "800px",
-    // title: textTitle,
-    message: message,
-    position: "bottomCenter",
-  });
-}

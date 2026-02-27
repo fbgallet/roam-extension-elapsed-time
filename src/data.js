@@ -1,5 +1,5 @@
-import { getCategories, getLimits } from ".";
-import { simpleIziMessage } from "./elapsedTime";
+import { getCategories, getLimits } from "./categories";
+import { simpleIziMessage } from "./notify";
 import {
   addChildrenBlocks,
   addPullWatch,

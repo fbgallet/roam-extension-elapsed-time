@@ -21,15 +21,22 @@ export function getTreeByPageTitle(pageTitle) {
 									  [?cuid :block/string ?s]]`);
 }
 
+let _childrenTreeCache = new Map();
+
+export function clearChildrenTreeCache() {
+  _childrenTreeCache.clear();
+}
+
 export function getChildrenTree(uid) {
-  if (uid) {
-    let result = window.roamAlphaAPI.q(`[:find (pull ?page
-      [:block/uid :block/string :block/children :block/order {:block/page [:block/uid]} {:block/refs [:block/uid]}
-         {:block/children ...} ])
-       :where [?page :block/uid "${uid}"]  ]`);
-    if (result.length > 0) return result[0][0].children;
-  }
-  return null;
+  if (!uid) return null;
+  if (_childrenTreeCache.has(uid)) return _childrenTreeCache.get(uid);
+  let result = window.roamAlphaAPI.q(`[:find (pull ?page
+    [:block/uid :block/string :block/children :block/order {:block/page [:block/uid]} {:block/refs [:block/uid]}
+       {:block/children ...} ])
+     :where [?page :block/uid "${uid}"]  ]`);
+  const tree = result.length > 0 ? result[0][0].children : null;
+  _childrenTreeCache.set(uid, tree);
+  return tree;
 }
 
 export function getParentUID(uid) {

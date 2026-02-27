@@ -1,27 +1,27 @@
 import {
-  displaySubCat,
   durationRegex,
-  limitFlag,
-  limitFormat,
-  totalFormat,
-  totalTitle,
-  categoriesRegex,
-  categoriesArray,
-  autoCopyTotalToClipboard,
   displayTotalAsTable,
   includePomodoros,
-  categoriesAsRef,
   includeEmbeds,
 } from ".";
-import { simpleIziMessage } from "./elapsedTime";
 import {
-  convertMinutesToDecimals,
-  convertMinutesTohhmm,
+  categoriesArray,
+  categoriesAsRef,
+  categoriesRegex,
+} from "./categories";
+import {
+  copyTotalToClipboard,
+  getTotalTimeOutput,
+  insertTableOfTotalByCategory,
+  insertTotalTimeByCategory,
+  prepareTotalTimeInsersion,
+} from "./display";
+import {
+  clearChildrenTreeCache,
   convertPeriodInNumberOfDays,
   createBlock,
   dateIsInPeriod,
   embedRegex,
-  getBlockContent,
   getBlocksIncludingRef,
   getChildrenTree,
   getCommonElements,
@@ -34,9 +34,6 @@ import {
   getWeek,
   getWeekNumber,
   getYesterdayDate,
-  simpleCreateBlock,
-  simulateClick,
-  sumOfArrayElements,
 } from "./util";
 
 const pomodoroRegex = /\{\{\[?\[?POMO\]?\]?: ?([0-9]*)\}\}/;
@@ -44,9 +41,12 @@ const totalPomo = {
   nb: 0,
   time: 0,
 };
-let titleIsRef = true; // Trigger words are inserted as block references in Total display
 let uncategorized;
 let outputForClipboard;
+
+export function getUncategorized() { return uncategorized; }
+export function getOutputForClipboard() { return outputForClipboard; }
+export function setOutputForClipboard(val) { outputForClipboard = val; }
 
 /*========================================================================*/
 /* TOTAL TIME ON CURRENT PAGE
@@ -99,6 +99,7 @@ export async function totalTime(
 function resetTotalTimes() {
   uncategorized = 0;
   outputForClipboard = "";
+  clearChildrenTreeCache();
   totalPomo.nb = 0;
   totalPomo.time = 0;
   for (let i = 0; i < categoriesArray.length; i++) {
@@ -285,23 +286,17 @@ function extractPomodoro(content) {
 
 function getTotalTimeInTree(tree, uidToExclude = null) {
   if (!tree) return 0;
-  let stringified = JSON.stringify(tree); //.split('"string":"');
-  if (extractElapsedTime(stringified)) {
-    let total = 0;
-    stringified.split('"string":"').forEach((string) => {
-      let result = extractElapsedTime(string);
-      if (!result && includePomodoros) {
-        result = extractPomodoro(string);
-      }
-      if (
-        uidToExclude &&
-        uidToExclude.includes(string.split('"uid":"')[1]?.slice(0, 9))
-      )
-        result = 0;
-      total += !result ? 0 : result;
-    });
-    return total;
-  } else return 0;
+  let total = 0;
+  for (const node of tree) {
+    if (uidToExclude?.includes(node.uid)) continue;
+    const time =
+      extractElapsedTime(node.string) ||
+      (includePomodoros ? extractPomodoro(node.string) : null);
+    total += time || 0;
+    if (node.children)
+      total += getTotalTimeInTree(node.children, uidToExclude);
+  }
+  return total;
 }
 
 /*=======================================================================*/
@@ -416,14 +411,12 @@ export async function getTotalTimeFromPreviousDays(
 }
 
 async function sumDailyLogs(dnpUidArray) {
-  let total = [];
-  await Promise.all(
-    dnpUidArray.map(async (day) => {
-      let dayLog = new DayLog(day);
-      total.push(await getTotaTimeInDailyLog(dayLog));
-    })
-  );
-  return sumOfArrayElements(total);
+  let total = 0;
+  for (const day of dnpUidArray) {
+    let dayLog = new DayLog(day);
+    total += await getTotaTimeInDailyLog(dayLog);
+  }
+  return total;
 }
 
 export function displayTotalByPeriod(
@@ -534,321 +527,11 @@ function extractElapsedTime(content) {
 
 function hasElapsedTimeInChildren(tree) {
   if (!tree) return false;
-  else tree = tree.flat(Infinity);
-  let stringified = JSON.stringify(tree);
-  if (extractElapsedTime(stringified)) {
-    return true;
-  } else return false;
+  for (const node of tree) {
+    if (extractElapsedTime(node.string)) return true;
+    if (includePomodoros && extractPomodoro(node.string)) return true;
+    if (node.children && hasElapsedTimeInChildren(node.children)) return true;
+  }
+  return false;
 }
 
-/*========================================================================*/
-// FUNCTIONS FOR OUTPUT AND DISPLAY TOTALS
-/*========================================================================*/
-class Output {
-  constructor(s, n, t = 0, l = null) {
-    this.text = s;
-    this.name = n;
-    this.time = t;
-    this.limit = l;
-    this.children = [];
-  }
-
-  setChildren(child) {
-    this.children = child;
-  }
-  addChild(child) {
-    this.children.push(child);
-  }
-  getText() {
-    return this.text;
-  }
-}
-
-function formatDisplayTime(
-  w,
-  title,
-  period = "day",
-  formatTag = "",
-  hide = false
-) {
-  let t;
-  let l = "";
-  if (w !== null) {
-    t = w.time;
-    l = displayLimit(w, period);
-  } else t = uncategorized;
-  let totalTitleToReturn = totalTitle;
-  if (title == "") {
-    return totalTitle
-      .replace("<tm>", t.toString())
-      .replace("<th>", convertMinutesTohhmm(t))
-      .replace("<td>", convertMinutesToDecimals(t));
-  } else if (title.includes("period:")) {
-    let matchingPeriodPlaceholder = totalTitle.match(/\[.*<period>.*\]/g);
-    if (matchingPeriodPlaceholder)
-      if (totalTitle.includes("<period>") && matchingPeriodPlaceholder) {
-        if (!isNaN(period)) {
-          totalTitleToReturn = totalTitleToReturn.replace(
-            matchingPeriodPlaceholder[0],
-            title.split("period:")[1]
-          );
-        } else
-          totalTitleToReturn = totalTitle.replace(
-            matchingPeriodPlaceholder[0],
-            matchingPeriodPlaceholder[0].slice(1, -1)
-          );
-      }
-    return totalTitleToReturn
-      .replace("<period>", period)
-      .replace("<tm>", t.toString())
-      .replace("<td>", convertMinutesToDecimals(t))
-      .replace("<th>", convertMinutesTohhmm(t)); // + ` ${title.slice(7)}`
-  }
-  if (hide) return title;
-  return (
-    totalFormat
-      .replace("<category>", title)
-      .replace("<tm>", t.toString())
-      .replace("<th>", convertMinutesTohhmm(t))
-      .replace("<td>", convertMinutesToDecimals(t))
-      .replace("<limit>", l)
-      //  .replace("<diff>", getDifferenceWithLimit(t, l))
-      .trim() +
-    " " +
-    formatTag
-  );
-}
-
-export function getDifferenceWithLimit(time, limit) {
-  let diffToDisplay = "";
-  let diff = time - limit;
-  if (diff && diff !== 0)
-    diff > 0
-      ? (diffToDisplay = `+${convertMinutesTohhmm(diff)}`)
-      : (diffToDisplay = `${convertMinutesTohhmm(diff)}`);
-  return diffToDisplay;
-}
-
-function displayLimit(w, period = "day") {
-  let flag = "";
-  let comp = "";
-  if (w.limit != null && w.limit.type != "undefined" && w.limit[period] > 0) {
-    if (w.limit.type == "goal") {
-      if (w.time >= w.limit[period]) {
-        flag = limitFlag.day.goal.success;
-        comp = ">=";
-      } else {
-        flag = limitFlag.day.goal.failure;
-        comp = "<";
-      }
-    } else if (w.limit.type == "limit") {
-      if (w.time <= w.limit[period]) {
-        flag = limitFlag.day.limit.success;
-        comp = "<=";
-      } else {
-        flag = limitFlag.day.limit.failure;
-        comp = ">";
-      }
-    }
-    let diffToDisplay = getDifferenceWithLimit(w.time, w.limit[period]);
-
-    let r = limitFormat
-      .replace("<type>", w.limit.type)
-      .replace("<value>", convertMinutesTohhmm(w.limit[period]))
-      .replace("<flag>", flag)
-      .replace("<comp>", comp)
-      .replace("<diff>", diffToDisplay);
-    return r;
-  }
-  return "";
-}
-
-function getTotalTimeOutput(total, period = "day", simple) {
-  let periodToDisplay;
-  if (period && isNaN(period)) {
-    if (!period.includes("last")) periodToDisplay = `period: ${period}`;
-    else periodToDisplay = `period: ${period}`;
-  } else if (period && !isNaN(period))
-    periodToDisplay = "period: since " + period + " days";
-  else periodToDisplay = "";
-  //console.log(categoriesArray);
-  let totalOutput = new Output(null);
-  if (simple) {
-    totalOutput.text = formatDisplayTime({ time: total }, periodToDisplay, period);
-    totalOutput.time = total;
-    return totalOutput;
-  }
-  let parentCategories = categoriesArray.filter((cat) => !cat.parent);
-  parentCategories.forEach((parent) => {
-    setCategoryOutput(parent, totalOutput, period);
-  });
-  if (uncategorized !== 0)
-    totalOutput.addChild(
-      new Output(
-        formatDisplayTime(null, "__Uncategorized__"),
-        "Uncategorized",
-        uncategorized
-      )
-    );
-  // If total was not provided (period aggregation), sum from categories + uncategorized
-  if (total === 0) {
-    total =
-      parentCategories.reduce((sum, cat) => sum + cat.time, 0) + uncategorized;
-  }
-  let displayTotal = formatDisplayTime({ time: total }, periodToDisplay, period);
-  totalOutput.time = total;
-  totalOutput.text = displayTotal;
-  return totalOutput;
-}
-
-function setCategoryOutput(category, parentOutput, period = "day") {
-  if (category.time !== 0) {
-    let title;
-    if (titleIsRef && category.type === "text") {
-      title = "((" + category.uid + "))";
-    } else {
-      title = category.name;
-      // space needed to not insert ':' in the tag name
-      if (category.type === "pageRef") title += " ";
-    }
-    let hideTime =
-      displaySubCat &&
-      category.children &&
-      category.children.filter((cat) => cat.time !== 0).length === 1 &&
-      category.children.filter((cat) => cat.time !== 0)[0].time ===
-        category.time
-        ? true
-        : false;
-    let formatedCatTotal = formatDisplayTime(
-      category,
-      title,
-      period,
-      category.format,
-      hideTime
-    );
-    let output = new Output(
-      formatedCatTotal,
-      title,
-      category.time,
-      displayLimit(category, period)
-    );
-    parentOutput.addChild(output);
-    if (displaySubCat && category.children) {
-      category.children.forEach((child) =>
-        setCategoryOutput(child, output, period)
-      );
-    }
-  }
-}
-
-function prepareTotalTimeInsersion(uid, value, position = -1) {
-  if (position == -1) {
-    window.roamAlphaAPI.updateBlock({
-      block: { uid: uid, string: value },
-    });
-    return uid;
-  } else {
-    let totalUid = window.roamAlphaAPI.util.generateUID();
-    window.roamAlphaAPI.createBlock({
-      location: { "parent-uid": uid, order: position },
-      block: { uid: totalUid, string: value },
-    });
-    window.roamAlphaAPI.updateBlock({
-      block: {
-        uid: uid,
-        string: getBlockContent(uid) + "((" + totalUid + "))",
-      },
-    });
-    return totalUid;
-  }
-}
-
-function insertTotalTimeByCategory(uid, output, isSub = false) {
-  for (let i = 0; i < output.children.length; i++) {
-    if (output.children[i] != undefined) {
-      let catUid = window.roamAlphaAPI.util.generateUID();
-      window.roamAlphaAPI.createBlock({
-        location: { "parent-uid": uid, order: i },
-        block: { uid: catUid, string: output.children[i].getText() },
-      });
-      if (output.children[i].children.length != 0)
-        insertTotalTimeByCategory(catUid, output.children[i], true);
-    }
-  }
-  // if (uncategorized != 0 && !isSub && output.children.length != 0) {
-  //   window.roamAlphaAPI.createBlock({
-  //     location: { "parent-uid": uid, order: output.children.length },
-  //     block: { string: formatDisplayTime(null, "__Uncategorized__", "") },
-  //   });
-  // }
-  return;
-}
-
-function getListOfTotalByCategory(categories, shift = "") {
-  categories.forEach((cat) => {
-    if (cat.time !== 0) {
-      let time = totalFormat.includes("<td>")
-        ? convertMinutesToDecimals(cat.time)
-        : cat.time;
-      outputForClipboard += shift + cat.name + "\t" + time + "\n";
-    }
-    if (cat.time !== 0 && cat.children != undefined) {
-      getListOfTotalByCategory(cat.children, shift + "   ");
-    }
-  });
-}
-
-function insertTableOfTotalByCategory(
-  output,
-  parentUid,
-  shift = "",
-  order = "last"
-) {
-  if (order == 0) {
-    //console.log(output.time);
-    let tableComponent = output.time === 0 ? "" : "\n{{table}}";
-    window.roamAlphaAPI.updateBlock({
-      block: {
-        uid: parentUid,
-        string: output.text + tableComponent,
-        open: false,
-      },
-    });
-    order = "last";
-    setTimeout(() => {
-      simulateClick(document.querySelector(".roam-article"));
-    }, 100);
-  }
-  if (output.children.length > 0)
-    output.children.forEach((cat) => {
-      let format = shift === "" ? "**" : "";
-      let nameUid = window.roamAlphaAPI.util.generateUID();
-      simpleCreateBlock(parentUid, nameUid, format + shift + cat.name + format);
-      let timeUid = window.roamAlphaAPI.util.generateUID();
-      let time = totalFormat.includes("<th>")
-        ? convertMinutesTohhmm(cat.time)
-        : totalFormat.includes("<td>")
-        ? convertMinutesToDecimals(cat.time)
-        : cat.time.toString();
-      simpleCreateBlock(nameUid, timeUid, format + time + format);
-      if (cat.limit) {
-        simpleCreateBlock(timeUid, null, cat.limit);
-      }
-      if (cat.children.length > 0) {
-        insertTableOfTotalByCategory(cat, parentUid, shift + "   ");
-      }
-    });
-}
-
-function copyTotalToClipboard() {
-  if (autoCopyTotalToClipboard) {
-    const filteredCatArray = categoriesArray.filter((cat) => !cat.parent);
-    if (uncategorized)
-      filteredCatArray.push({ name: "Uncategorized", time: uncategorized });
-    getListOfTotalByCategory(filteredCatArray);
-    navigator.clipboard.writeText(outputForClipboard);
-    simpleIziMessage(
-      "Total times copied to clipboard in a simple table, easy to export."
-    );
-  }
-}
