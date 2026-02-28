@@ -96,7 +96,7 @@ export async function totalTime(
   }
 }
 
-function resetTotalTimes() {
+export function resetTotalTimes() {
   uncategorized = 0;
   outputForClipboard = "";
   clearChildrenTreeCache();
@@ -112,7 +112,7 @@ function resetTotalTimes() {
   }
 }
 
-async function directChildrenProcess(tree, parentBlockCat = null) {
+export async function directChildrenProcess(tree, parentBlockCat = null) {
   let total = 0;
   if (tree) {
     for (let i = 0; i < tree.length; i++) {
@@ -433,7 +433,7 @@ export function displayTotalByPeriod(
   if (totalOutput.children.length != 0) copyTotalToClipboard();
 }
 
-async function getPreviousDailyLogs(today, period) {
+export async function getPreviousDailyLogs(today, period) {
   let dateFlag = 0;
   let nbOfDays, limitedNb;
   if (isNaN(period)) {

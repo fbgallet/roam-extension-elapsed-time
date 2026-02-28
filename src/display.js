@@ -58,36 +58,48 @@ export function getDifferenceWithLimit(time, limit) {
 }
 
 function displayLimit(w, period = "day") {
-  let flag = "";
-  let comp = "";
-  if (w.limit != null && w.limit.type != "undefined" && w.limit[period] > 0) {
-    if (w.limit.type == "goal") {
-      if (w.time >= w.limit[period]) {
-        flag = limitFlag.day.goal.success;
-        comp = ">=";
-      } else {
-        flag = limitFlag.day.goal.failure;
-        comp = "<";
-      }
-    } else if (w.limit.type == "limit") {
-      if (w.time <= w.limit[period]) {
-        flag = limitFlag.day.limit.success;
-        comp = "<=";
-      } else {
-        flag = limitFlag.day.limit.failure;
-        comp = ">";
-      }
+  let parts = [];
+  // Display goal flag
+  if (w.limit?.goal?.[period] > 0) {
+    let flag, comp;
+    if (w.time >= w.limit.goal[period]) {
+      flag = limitFlag.day.goal.success;
+      comp = ">=";
+    } else {
+      flag = limitFlag.day.goal.failure;
+      comp = "<";
     }
-    let diffToDisplay = getDifferenceWithLimit(w.time, w.limit[period]);
-    let r = limitFormat
-      .replace("<type>", w.limit.type)
-      .replace("<value>", convertMinutesTohhmm(w.limit[period]))
-      .replace("<flag>", flag)
-      .replace("<comp>", comp)
-      .replace("<diff>", diffToDisplay);
-    return r;
+    let diffToDisplay = getDifferenceWithLimit(w.time, w.limit.goal[period]);
+    parts.push(
+      limitFormat
+        .replace("<type>", "goal")
+        .replace("<value>", convertMinutesTohhmm(w.limit.goal[period]))
+        .replace("<flag>", flag)
+        .replace("<comp>", comp)
+        .replace("<diff>", diffToDisplay)
+    );
   }
-  return "";
+  // Display limit flag
+  if (w.limit?.limit?.[period] > 0) {
+    let flag, comp;
+    if (w.time <= w.limit.limit[period]) {
+      flag = limitFlag.day.limit.success;
+      comp = "<=";
+    } else {
+      flag = limitFlag.day.limit.failure;
+      comp = ">";
+    }
+    let diffToDisplay = getDifferenceWithLimit(w.time, w.limit.limit[period]);
+    parts.push(
+      limitFormat
+        .replace("<type>", "limit")
+        .replace("<value>", convertMinutesTohhmm(w.limit.limit[period]))
+        .replace("<flag>", flag)
+        .replace("<comp>", comp)
+        .replace("<diff>", diffToDisplay)
+    );
+  }
+  return parts.join(" ");
 }
 
 function formatDisplayTime(

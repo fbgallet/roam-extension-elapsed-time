@@ -229,7 +229,7 @@ const pullWatchCallbacks = new Map();
 
 export function addPullWatch(uid, callback) {
   console.log("Pullwatch on " + uid);
-  const wrapper = () => callback(uid);
+  const wrapper = () => { console.log("[ET] pull watch fired for uid:", uid); callback(uid); };
   pullWatchCallbacks.set(uid + callback.name, wrapper);
   window.roamAlphaAPI.data.addPullWatch(
     "[:block/children :block/string {:block/children ...}]",

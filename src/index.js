@@ -23,9 +23,12 @@ import {
   normalizeUID,
   removePullWatch,
 } from "./util";
-import { getCategories, getLimits } from "./categories";
+import { getCategories, getLimits, getLimitsFromSettings } from "./categories";
+import { openCategoriesManager } from "./components/CategoriesManager";
+import { openTimeDashboard } from "./components/TimeDashboard";
 
 /************************* PANEL SETTINGS VAR **************************/
+let _extensionAPI;
 let categoriesUID, limitsUID, flagsDropdown, customFlags;
 export let confirmPopup,
   displaySubCat,
@@ -60,7 +63,10 @@ export const limitFlagDefault = {
 
 function getParameters() {
   if (categoriesUID != null) getCategories(normalizeUID(categoriesUID));
-  if (limitsUID != null) getLimits(normalizeUID(limitsUID));
+  // Prefer settings-based limits; fall back to block-based
+  if (!getLimitsFromSettings(_extensionAPI)) {
+    if (limitsUID != null) getLimits(normalizeUID(limitsUID));
+  }
   switch (flagsDropdown) {
     case "Color block tags (green/red)":
       limitFlag = getLimitFlags("Tags");
@@ -208,6 +214,20 @@ function registerPaletteCommands(extensionAPI) {
   //     displayTotalTimesTable();
   //   },
   // });
+
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Time Tracker: Manage categories, goals & limits",
+    callback: () => {
+      openCategoriesManager(extensionAPI, categoriesUID, limitsUID);
+    },
+  });
+
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Time Tracker: Open Dashboard",
+    callback: () => {
+      openTimeDashboard();
+    },
+  });
 
   if (getBlockAttributes(categoriesUID)) {
     addOpenCategoriesAndLimitsCommands(extensionAPI);
@@ -368,6 +388,7 @@ function correctUidInput(uid) {
 
 export default {
   onload: async ({ extensionAPI }) => {
+    _extensionAPI = extensionAPI;
     const panelConfig = {
       tabTitle: "Time Tracker",
       settings: [
@@ -448,7 +469,7 @@ export default {
           id: "categoriesSetting",
           name: "Categories",
           description:
-            "Parent block reference where your categories and subcategories are listed:",
+            'Parent block reference where your categories and subcategories are listed. Use command "Time Tracker: Manage categories, goals & limits" to open the manager dialog:',
           action: {
             type: "input",
             onChange: (evt) => {

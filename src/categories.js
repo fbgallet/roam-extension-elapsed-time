@@ -1,5 +1,6 @@
 import {
   convertStringDurationToMinutes,
+  clearChildrenTreeCache,
   getChildrenTree,
   getLonguestPageTitleFromUids,
   getRegexFromArray,
@@ -10,6 +11,20 @@ export let categoriesArray = [];
 export let categoriesNames = [];
 export let categoriesAsRef = [];
 export let categoriesRegex;
+
+// Version counter incremented on each getCategories() call.
+// Components can poll this to detect changes.
+export let categoriesVersion = 0;
+const changeListeners = new Set();
+export function onCategoriesChange(callback) {
+  changeListeners.add(callback);
+  return () => changeListeners.delete(callback);
+}
+function notifyCategoriesChange() {
+  categoriesVersion++;
+  console.log("[ET] notifyCategoriesChange, version:", categoriesVersion, "listeners:", changeListeners.size);
+  changeListeners.forEach((cb) => cb(categoriesVersion));
+}
 
 const TYPE = {
   text: "text",
@@ -23,7 +38,10 @@ export class Category {
     this.uid = uid;
     this.display = true;
     this.type = this.getType(s.trim());
-    this.limit = { type: "undefined", task: 0, day: 0 };
+    this.limit = {
+      goal: { task: 0, day: 0, week: 0, month: 0 },
+      limit: { task: 0, day: 0, week: 0, month: 0 },
+    };
     this.time = 0;
     this.format = f;
     this.children = [];
@@ -44,7 +62,10 @@ export class Category {
     return s.trim();
   }
   getLimitByInterval(interval) {
-    return [this.limit[interval], this.limit.type];
+    return {
+      goal: this.limit.goal[interval] || 0,
+      limit: this.limit.limit[interval] || 0,
+    };
   }
   getType(name) {
     const uidRegex = /^\(\([^\)]{9}\)\)$/g;
@@ -54,15 +75,17 @@ export class Category {
     else return TYPE.text;
   }
   setLimit(type, interval, time) {
-    this.limit.type = type;
-    this.limit[interval] = time;
+    this.limit[type][interval] = time;
   }
   resetLimit() {
-    this.limit.type = "undefined";
-    this.limit.task = 0;
-    this.limit.day = 0;
-    this.limit.week = 0;
-    this.limit.month = 0;
+    this.limit.goal = { task: 0, day: 0, week: 0, month: 0 };
+    this.limit.limit = { task: 0, day: 0, week: 0, month: 0 };
+  }
+  hasGoal() {
+    return Object.values(this.limit.goal).some((v) => v > 0);
+  }
+  hasLimit() {
+    return Object.values(this.limit.limit).some((v) => v > 0);
   }
   addTime(time) {
     this.time += time;
@@ -146,9 +169,13 @@ export function scanCategories(s, refs, callBack, once) {
 }
 
 export function getCategories(parentUid) {
+  console.log("[ET] getCategories called, uid:", parentUid);
   categoriesArray.length = 0;
   categoriesNames.length = 0;
+  // Clear cache so pull-watch-triggered calls always read fresh data from Roam DB
+  if (parentUid) clearChildrenTreeCache();
   let triggerTree = parentUid ? getChildrenTree(parentUid) : null;
+  console.log("[ET] triggerTree length:", triggerTree?.length);
 
   if (triggerTree) {
     for (let i = 0; i < triggerTree.length; i++) {
@@ -176,6 +203,7 @@ export function getCategories(parentUid) {
     categoriesNames.length = 0;
     categoriesRegex = null;
   }
+  notifyCategoriesChange();
 
   function getSubCategories(tree, topTrigger, hideTop) {
     for (let j = 0; j < tree.length; j++) {
@@ -267,7 +295,7 @@ function getLimitsByTypeAndInterval(type, interval, tree) {
   }
 }
 
-function searchSubCatByUidOrWord(value, attr) {
+export function searchSubCatByUidOrWord(value, attr) {
   for (let i = 0; i < categoriesArray.length; i++) {
     let subCat = categoriesArray[i].children;
     if (subCat) {
@@ -278,4 +306,118 @@ function searchSubCatByUidOrWord(value, attr) {
     }
   }
   return null;
+}
+
+/*======================================================================================================*/
+/* SETTINGS-BASED LIMITS                                                                                */
+/*======================================================================================================*/
+
+const INTERVALS = ["task", "day", "week", "month"];
+const emptyIntervals = () => ({ task: 0, day: 0, week: 0, month: 0 });
+
+export function getCategoryLimitsMap(extensionAPI) {
+  return extensionAPI.settings.get("categoryLimits") || {};
+}
+
+export function getLimitsFromSettings(extensionAPI) {
+  const limitsMap = extensionAPI.settings.get("categoryLimits");
+  if (!limitsMap || Object.keys(limitsMap).length === 0) return false;
+
+  resetLimits();
+
+  Object.entries(limitsMap).forEach(([uid, config]) => {
+    const cat =
+      categoriesArray.find((c) => c.uid === uid) ||
+      searchSubCatByUidOrWord(uid, "uid");
+    if (!cat) return;
+    ["goal", "limit"].forEach((type) => {
+      if (config[type]) {
+        INTERVALS.forEach((interval) => {
+          if (config[type][interval] > 0) {
+            cat.setLimit(type, interval, config[type][interval]);
+          }
+        });
+      }
+    });
+  });
+  return true;
+}
+
+export function saveLimitToSettings(extensionAPI, categoryUid, limitConfig) {
+  const limitsMap = extensionAPI.settings.get("categoryLimits") || {};
+  limitsMap[categoryUid] = limitConfig;
+  extensionAPI.settings.set("categoryLimits", limitsMap);
+
+  // Apply to in-memory Category immediately
+  const cat =
+    categoriesArray.find((c) => c.uid === categoryUid) ||
+    searchSubCatByUidOrWord(categoryUid, "uid");
+  if (cat) {
+    cat.resetLimit();
+    ["goal", "limit"].forEach((type) => {
+      if (limitConfig[type]) {
+        INTERVALS.forEach((interval) => {
+          if (limitConfig[type][interval] > 0) {
+            cat.setLimit(type, interval, limitConfig[type][interval]);
+          }
+        });
+      }
+    });
+  }
+}
+
+export function migrateLimitsFromBlocks(limitsUid, extensionAPI) {
+  const tree = limitsUid ? getChildrenTree(limitsUid) : null;
+  if (!tree) return null;
+
+  const limitsMap = {};
+
+  function ensureEntry(uid) {
+    if (!limitsMap[uid]) {
+      limitsMap[uid] = { goal: emptyIntervals(), limit: emptyIntervals() };
+    }
+  }
+
+  tree.forEach((limitType) => {
+    const typeStr = limitType.string?.toLowerCase();
+    let type = null;
+    if (typeStr?.includes("goal")) type = "goal";
+    else if (typeStr?.includes("limit")) type = "limit";
+    if (!type || !limitType.children) return;
+
+    limitType.children.forEach((limitInterval) => {
+      const content = limitInterval.string?.toLowerCase();
+      if (!limitInterval.children) return;
+      let interval = null;
+      if (content?.includes("day")) interval = "day";
+      else if (content?.includes("interval")) interval = "task";
+      else if (content?.includes("week")) interval = "week";
+      else if (content?.includes("month")) interval = "month";
+      if (!interval) return;
+
+      limitInterval.children.forEach((limitDuration) => {
+        if (!limitDuration.children) return;
+        const duration = limitDuration.string
+          ? convertStringDurationToMinutes(limitDuration.string)
+          : undefined;
+        if (isNaN(duration)) return;
+
+        limitDuration.children.forEach((catRef) => {
+          const uid = catRef.string?.slice(2, -2);
+          const tw =
+            categoriesArray.find((item) => item.uid === uid) ||
+            searchSubCatByUidOrWord(uid, "uid");
+          if (tw) {
+            ensureEntry(tw.uid);
+            limitsMap[tw.uid][type][interval] = parseInt(duration);
+          }
+        });
+      });
+    });
+  });
+
+  extensionAPI.settings.set("categoryLimits", limitsMap);
+  // Apply immediately
+  getLimitsFromSettings(extensionAPI);
+  return limitsMap;
 }

@@ -170,20 +170,16 @@ function compareToLimitsAndUpdate(
   let limitType = "Goal or limit";
   if (limitPresets && !withMin && !withMax && !withPomo) {
     let refs = getBlocksUidReferencedInThisBlock(blockUID);
-    //let limitTab = getLimitOfFirstCategorie(rightPart.toLowerCase(), refs);
-    let limitTab = scanCategories(rightPart, refs, getLimitFromCategorie, true);
-    let timeLimit = limitTab[0];
-    if (timeLimit > 0) {
-      limitType = limitTab[1];
-    }
-    if (limitType == "limit") {
-      limitType = "Limit";
-      withMax = true;
-      timeLimitMax = timeLimit;
-    } else if (limitType == "goal") {
-      limitType = "Goal";
+    let limitResult = scanCategories(rightPart, refs, getLimitFromCategorie, true);
+    if (limitResult.goal > 0) {
       withMin = true;
-      timeLimitMin = timeLimit;
+      timeLimitMin = limitResult.goal;
+      limitType = "Goal";
+    }
+    if (limitResult.limit > 0) {
+      withMax = true;
+      timeLimitMax = limitResult.limit;
+      limitType = limitResult.goal > 0 ? "Goal & Limit" : "Limit";
     }
   }
   let triggered = withMax || withMin || withPomo;
@@ -339,7 +335,7 @@ function removePreviousDuration(content) {
 }
 
 function getLimitFromCategorie(tw, i = 0, j = 0) {
-  if (tw == null) return [i, j];
+  if (tw == null) return { goal: i, limit: j };
   return tw.getLimitByInterval("task");
 }
 

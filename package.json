@@ -4,6 +4,7 @@
   "description": "Easily **track the time spent on your activities and calculate the total daily time spent on them**, organized by categories and sub-categories, and see if predefined **limits or goals** are respected. Helps to implement **interstitial journaling**.",
   "main": "extension.js",
   "dependencies": {
+    "chart.js": "^4.5.1",
     "roamjs-components": "^0.75.1",
     "roamjs-scripts": "^0.26.29"
   },
