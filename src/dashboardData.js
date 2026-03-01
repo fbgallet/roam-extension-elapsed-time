@@ -25,28 +25,7 @@ import {
  */
 export async function getDashboardData(startDate, endDate) {
   const days = getDayUids(startDate, endDate);
-
-  const serializeLimits = (cat) => ({
-    goal: { ...cat.limit.goal },
-    limit: { ...cat.limit.limit },
-  });
-
-  const serializeCategory = (cat, parentUid = null) => ({
-    uid: cat.uid,
-    name: cat.name,
-    isTag: cat.isTag || false,
-    parentUid,
-    limits: serializeLimits(cat),
-    children: (cat.children || []).map((child) => serializeCategory(child, cat.uid)),
-  });
-
-  const categories = categoriesArray
-    .filter((cat) => !cat.parent && !cat.isTag)
-    .map((cat) => serializeCategory(cat));
-
-  const tags = categoriesArray
-    .filter((cat) => cat.isTag)
-    .map((cat) => serializeCategory(cat));
+  const { categories, tags } = serializeCategories();
 
   const matrix = {};
   const uncategorizedPerDay = {};
@@ -60,26 +39,15 @@ export async function getDashboardData(startDate, endDate) {
       grandTotal += dayTotal;
     }
 
-    // Snapshot category times for this day
-    const daySnapshot = {};
-    for (const cat of categoriesArray) {
-      if (cat.time > 0) {
-        daySnapshot[cat.uid] = cat.time;
-      }
-    }
-    matrix[dayUid] = daySnapshot;
+    matrix[dayUid] = snapshotCategoryTimes();
     uncategorizedPerDay[dayUid] = getUncategorized();
   }
 
-  // Compute totals across all days
-  const totals = {};
-  let uncategorizedTotal = 0;
-  for (const dayUid of days) {
-    for (const [uid, time] of Object.entries(matrix[dayUid])) {
-      totals[uid] = (totals[uid] || 0) + time;
-    }
-    uncategorizedTotal += uncategorizedPerDay[dayUid] || 0;
-  }
+  const { totals, uncategorizedTotal } = computeTotals(
+    matrix,
+    uncategorizedPerDay,
+    days
+  );
 
   // Clean up global state
   resetTotalTimes();
@@ -96,9 +64,68 @@ export async function getDashboardData(startDate, endDate) {
 }
 
 /**
+ * Serialize the current categoriesArray into plain objects for React state.
+ */
+export function serializeCategories() {
+  const serializeLimits = (cat) => ({
+    goal: { ...cat.limit.goal },
+    limit: { ...cat.limit.limit },
+  });
+
+  const serializeCategory = (cat, parentUid = null) => ({
+    uid: cat.uid,
+    name: cat.name,
+    isTag: cat.isTag || false,
+    parentUid,
+    limits: serializeLimits(cat),
+    children: (cat.children || []).map((child) =>
+      serializeCategory(child, cat.uid)
+    ),
+  });
+
+  const categories = categoriesArray
+    .filter((cat) => !cat.parent && !cat.isTag)
+    .map((cat) => serializeCategory(cat));
+
+  const tags = categoriesArray
+    .filter((cat) => cat.isTag)
+    .map((cat) => serializeCategory(cat));
+
+  return { categories, tags };
+}
+
+/**
+ * Snapshot current category times after a directChildrenProcess pass.
+ */
+export function snapshotCategoryTimes() {
+  const snapshot = {};
+  for (const cat of categoriesArray) {
+    if (cat.time > 0) {
+      snapshot[cat.uid] = cat.time;
+    }
+  }
+  return snapshot;
+}
+
+/**
+ * Compute aggregate totals from a matrix of per-bucket category times.
+ */
+export function computeTotals(matrix, uncategorizedPerDay, bucketKeys) {
+  const totals = {};
+  let uncategorizedTotal = 0;
+  for (const key of bucketKeys) {
+    for (const [uid, time] of Object.entries(matrix[key] || {})) {
+      totals[uid] = (totals[uid] || 0) + time;
+    }
+    uncategorizedTotal += uncategorizedPerDay[key] || 0;
+  }
+  return { totals, uncategorizedTotal };
+}
+
+/**
  * Get an array of Roam daily note page UIDs for each day in [startDate, endDate].
  */
-function getDayUids(startDate, endDate) {
+export function getDayUids(startDate, endDate) {
   const uids = [];
   const current = new Date(startDate);
   current.setHours(0, 0, 0, 0);

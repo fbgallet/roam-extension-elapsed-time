@@ -32,6 +32,7 @@ import {
 } from "./categories";
 import { openCategoriesManager } from "./components/CategoriesManager";
 import { openTimeDashboard } from "./components/TimeDashboard";
+import { openPageTimeDashboard } from "./components/PageTimeDashboard";
 
 /************************* PANEL SETTINGS VAR **************************/
 let _extensionAPI;
@@ -232,6 +233,21 @@ function registerPaletteCommands(extensionAPI) {
     label: "Time Tracker: Open Dashboard",
     callback: () => {
       openTimeDashboard(extensionAPI);
+    },
+  });
+
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Time Tracker: Dashboard for current page",
+    callback: async () => {
+      let scopeUid;
+      const focusedUid =
+        window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
+      if (!focusedUid) {
+        scopeUid = await getMainPageUid();
+      } else {
+        scopeUid = getPageUidByAnyBlockUid(focusedUid);
+      }
+      openPageTimeDashboard(extensionAPI, "month", undefined, scopeUid);
     },
   });
 

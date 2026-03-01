@@ -15,7 +15,7 @@ import { getCategoryColorsMap } from "./CategoriesManager";
 
 Chart.register(...registerables);
 
-const CHART_COLORS = [
+export const CHART_COLORS = [
   "#2965CC",
   "#29A634",
   "#D99E0B",
@@ -74,7 +74,7 @@ const PRESETS = [
 /*──────────────────────────────────────────────────────────────────────────────
   PeriodSelector
 ──────────────────────────────────────────────────────────────────────────────*/
-const PeriodSelector = ({ preset, startDate, endDate, onChange }) => {
+export const PeriodSelector = ({ preset, startDate, endDate, onChange }) => {
   const [showCustom, setShowCustom] = useState(preset === "custom");
 
   const handlePreset = (key) => {
@@ -363,7 +363,7 @@ function buildTotalsClipboardText(data) {
 /*──────────────────────────────────────────────────────────────────────────────
   TotalsView
 ──────────────────────────────────────────────────────────────────────────────*/
-const TotalsView = ({ data, preset, fixedColors }) => {
+export const TotalsView = ({ data, preset, fixedColors, scopeCategory }) => {
   const [expandedSet, setExpandedSet] = useState(() => new Set());
   const [copied, setCopied] = useState(false);
   const interval = presetToInterval(preset);
@@ -388,9 +388,24 @@ const TotalsView = ({ data, preset, fixedColors }) => {
   if (data.grandTotal === 0)
     return <p className="et-empty-message">No tracked time in this period.</p>;
 
+  // When scopeCategory is set, promote its children to top-level
+  const displayCategories = useMemo(() => {
+    if (!scopeCategory) return data.categories;
+    const scopeCat = data.categories.find((c) => c.uid === scopeCategory.uid);
+    return scopeCat?.children?.length ? scopeCat.children : data.categories;
+  }, [data, scopeCategory]);
+
+  const otherCategories = useMemo(() => {
+    if (!scopeCategory) return [];
+    return data.categories.filter(
+      (c) => c.uid !== scopeCategory.uid && (data.totals[c.uid] || 0) > 0
+    );
+  }, [data, scopeCategory]);
+
   // maxTime for bar scaling = largest top-level category time
   const maxTime = Math.max(
-    ...data.categories.map((cat) => data.totals[cat.uid] || 0),
+    ...displayCategories.map((cat) => data.totals[cat.uid] || 0),
+    ...otherCategories.map((cat) => data.totals[cat.uid] || 0),
     data.uncategorized.total
   );
 
@@ -410,7 +425,7 @@ const TotalsView = ({ data, preset, fixedColors }) => {
           {copied ? "✓ Copied" : "Copy"}
         </button>
       </div>
-      {data.categories.map((cat, i) => (
+      {displayCategories.map((cat, i) => (
         <TotalsCategoryRow
           key={cat.uid}
           cat={cat}
@@ -460,6 +475,25 @@ const TotalsView = ({ data, preset, fixedColors }) => {
               </div>
             );
           })}
+        </div>
+      )}
+      {otherCategories.length > 0 && (
+        <div className="et-tags-section">
+          <div className="et-tags-section-header">Other categories</div>
+          {otherCategories.map((cat, i) => (
+            <TotalsCategoryRow
+              key={cat.uid}
+              cat={cat}
+              totals={data.totals}
+              maxTime={maxTime}
+              depth={0}
+              expandedSet={expandedSet}
+              onToggle={handleToggle}
+              interval={interval}
+              fixedColors={fixedColors}
+              catColor={fixedColors?.[cat.uid] || CHART_COLORS[i % CHART_COLORS.length]}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -520,7 +554,7 @@ const CategoryPickerNode = ({ cat, depth, selected, onToggle, colorMap, expanded
   );
 };
 
-const CategoryPicker = ({ categories, tags, totals, selected, onSelectionChange, colorMap }) => {
+export const CategoryPicker = ({ categories, tags, totals, selected, onSelectionChange, colorMap }) => {
   const [expandedSet, setExpandedSet] = useState(() => new Set());
 
   const handleToggle = (uid) => {
@@ -967,7 +1001,7 @@ function flattenCategories(categories) {
   TrendsView — trends tab with category picker, granularity switcher, chart,
   and CSV copy button
 ──────────────────────────────────────────────────────────────────────────────*/
-const TrendsView = ({ data, selected, setSelected, colorMap, granularity, setGranularity }) => {
+export const TrendsView = ({ data, selected, setSelected, colorMap, granularity, setGranularity, scopeCategory }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopyCSV = useCallback(() => {
@@ -979,10 +1013,21 @@ const TrendsView = ({ data, selected, setSelected, colorMap, granularity, setGra
     });
   }, [data, selected, granularity]);
 
+  // When scopeCategory is set, promote its children in the picker
+  const pickerCategories = useMemo(() => {
+    if (!scopeCategory || !data) return data?.categories || [];
+    const scopeCat = data.categories.find((c) => c.uid === scopeCategory.uid);
+    const promoted = scopeCat?.children?.length ? scopeCat.children : data.categories;
+    const others = data.categories.filter(
+      (c) => c.uid !== scopeCategory.uid && (data.totals[c.uid] || 0) > 0
+    );
+    return [...promoted, ...others];
+  }, [data, scopeCategory]);
+
   return (
     <div className="et-trends-layout">
       <CategoryPicker
-        categories={data?.categories || []}
+        categories={pickerCategories}
         tags={data?.tags || []}
         totals={data?.totals || {}}
         selected={selected}
@@ -1026,7 +1071,7 @@ const TrendsView = ({ data, selected, setSelected, colorMap, granularity, setGra
 /*──────────────────────────────────────────────────────────────────────────────
   TimeDashboard — main modal
 ──────────────────────────────────────────────────────────────────────────────*/
-const VALID_PERIODS = new Set(["day", "week", "month", "quarter"]);
+export const VALID_PERIODS = new Set(["day", "week", "month", "quarter"]);
 
 const TimeDashboard = ({ onClose, extensionAPI, initialPeriod, initialReferenceDate }) => {
   const [isOpen, setIsOpen] = useState(true);
