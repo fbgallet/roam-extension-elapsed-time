@@ -31,27 +31,22 @@ export async function getDashboardData(startDate, endDate) {
     limit: { ...cat.limit.limit },
   });
 
+  const serializeCategory = (cat, parentUid = null) => ({
+    uid: cat.uid,
+    name: cat.name,
+    isTag: cat.isTag || false,
+    parentUid,
+    limits: serializeLimits(cat),
+    children: (cat.children || []).map((child) => serializeCategory(child, cat.uid)),
+  });
+
   const categories = categoriesArray
-    .filter((cat) => !cat.parent)
-    .map((cat) => ({
-      uid: cat.uid,
-      name: cat.name,
-      parentUid: null,
-      limits: serializeLimits(cat),
-      children: (cat.children || []).map((child) => ({
-        uid: child.uid,
-        name: child.name,
-        parentUid: cat.uid,
-        limits: serializeLimits(child),
-        children: (child.children || []).map((gc) => ({
-          uid: gc.uid,
-          name: gc.name,
-          parentUid: child.uid,
-          limits: serializeLimits(gc),
-          children: [],
-        })),
-      })),
-    }));
+    .filter((cat) => !cat.parent && !cat.isTag)
+    .map((cat) => serializeCategory(cat));
+
+  const tags = categoriesArray
+    .filter((cat) => cat.isTag)
+    .map((cat) => serializeCategory(cat));
 
   const matrix = {};
   const uncategorizedPerDay = {};
@@ -92,6 +87,7 @@ export async function getDashboardData(startDate, endDate) {
   return {
     days,
     categories,
+    tags,
     matrix,
     totals,
     uncategorized: { perDay: uncategorizedPerDay, total: uncategorizedTotal },

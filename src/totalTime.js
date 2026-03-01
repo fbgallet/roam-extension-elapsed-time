@@ -129,19 +129,23 @@ export async function directChildrenProcess(tree, parentBlockCat = null) {
       if (!time) time = pomo ? pomo : null;
 
       let triggeredCat = [];
+      let triggeredTags = [];
       if (tree[i].refs?.length && categoriesAsRef.length) {
         let matchingRefs = getCommonElements(
           tree[i].refs.map((ref) => ref.uid),
           categoriesAsRef
         );
-        // console.log("matchingRefs :>> ", matchingRefs);
-        if (matchingRefs.length)
-          triggeredCat = triggeredCat.concat(
-            categoriesArray.filter(
-              (cat) => cat.ref && matchingRefs.includes(cat.ref)
-            )
+        if (matchingRefs.length) {
+          const matchedCats = categoriesArray.filter(
+            (cat) =>
+              (cat.ref && matchingRefs.includes(cat.ref)) ||
+              cat.aliasRefs?.some((r) => matchingRefs.includes(r))
           );
-        // console.log("triggeredCat :>> ", triggeredCat);
+          matchedCats.forEach((cat) => {
+            if (cat.isTag) triggeredTags.push(cat);
+            else triggeredCat.push(cat);
+          });
+        }
       }
       let matchingWords = blockContent.match(categoriesRegex);
       if (matchingWords) {
@@ -156,13 +160,14 @@ export async function directChildrenProcess(tree, parentBlockCat = null) {
         }
         catWithoutTime = triggeredCat.length ? triggeredCat[0] : parentBlockCat;
       } else {
-        //  time = parseInt(time);
         if (triggeredCat.length)
           triggeredCat.forEach((cat) => cat.addTime(time));
         else {
           if (parentBlockCat) parentBlockCat.addTime(time);
           else uncategorized += parseInt(time);
         }
+        // Tags accumulate time independently (informational, not added to total)
+        triggeredTags.forEach((tag) => tag.addTime(time));
         processChildren = false;
         total += parseInt(time);
       }
@@ -205,7 +210,8 @@ function getTriggeredCategoriesFromNames(names, parentBlockCat) {
       ...names.map((name) => {
         let possibleCategories = categoriesArray.filter((cat) =>
           cat.type === "text"
-            ? cat.name.toLowerCase() === name.toLowerCase()
+            ? cat.name.toLowerCase() === name.toLowerCase() ||
+              cat.aliases.some((a) => a.toLowerCase() === name.toLowerCase())
             : cat.name === name
         );
         if (possibleCategories) return possibleCategories;

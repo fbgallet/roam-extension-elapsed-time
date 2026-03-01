@@ -21,9 +21,15 @@ import {
   getPageUidByAnyBlockUid,
   getStringsAroundPlaceHolder,
   normalizeUID,
+  parseDashboardPeriodFromClick,
   removePullWatch,
 } from "./util";
-import { getCategories, getLimits, getLimitsFromSettings } from "./categories";
+import {
+  getCategories,
+  getLimits,
+  getLimitsFromSettings,
+  loadAliasesFromSettings,
+} from "./categories";
 import { openCategoriesManager } from "./components/CategoriesManager";
 import { openTimeDashboard } from "./components/TimeDashboard";
 
@@ -67,6 +73,7 @@ function getParameters() {
   if (!getLimitsFromSettings(_extensionAPI)) {
     if (limitsUID != null) getLimits(normalizeUID(limitsUID));
   }
+  loadAliasesFromSettings(_extensionAPI);
   switch (flagsDropdown) {
     case "Color block tags (green/red)":
       limitFlag = getLimitFlags("Tags");
@@ -78,7 +85,6 @@ function getParameters() {
       limitFlag = getLimitFlags("Icons");
   }
 }
-
 
 function getLimitFlags(type, input = "") {
   let goalS, goalF, limitS, limitF;
@@ -121,8 +127,8 @@ function getLimitFlags(type, input = "") {
 function setDurationRegex() {
   durationRegex = new RegExp(
     `${escapeCharacters(splittedDurationFormat[0])}([0-9]*)${escapeCharacters(
-      splittedDurationFormat[1]
-    )}`
+      splittedDurationFormat[1],
+    )}`,
   );
 }
 
@@ -225,7 +231,7 @@ function registerPaletteCommands(extensionAPI) {
   extensionAPI.ui.commandPalette.addCommand({
     label: "Time Tracker: Open Dashboard",
     callback: () => {
-      openTimeDashboard();
+      openTimeDashboard(extensionAPI);
     },
   });
 
@@ -236,6 +242,17 @@ function registerPaletteCommands(extensionAPI) {
   }
 }
 
+function registerSlashCommands() {
+  window.roamAlphaAPI.ui.slashCommand.addCommand({
+    label: "Time tracker",
+    callback: (args) => {
+      const startUid = args["block-uid"];
+      elapsedTime(startUid);
+      return "";
+    },
+  });
+}
+
 function addOpenSettingsCommand(extensionAPI) {
   extensionAPI.ui.commandPalette.addCommand({
     label: "Time Tracker: Set categories list, goals & limits",
@@ -243,7 +260,7 @@ function addOpenSettingsCommand(extensionAPI) {
       if (normalizeUID(categoriesUID) || normalizeUID(limitsUID)) {
         simpleIziMessage(
           "Categories block reference and/or Goals&Limits block reference are already defined, open extension settings to change them.",
-          "red"
+          "red",
         );
         return;
       }
@@ -259,7 +276,7 @@ function addOpenSettingsCommand(extensionAPI) {
 function addOpenCategoriesAndLimitsCommands(
   extensionAPI,
   catUid = categoriesUID,
-  limitUid = limitsUID
+  limitUid = limitsUID,
 ) {
   updateOpenCategoriesCommand(extensionAPI, catUid);
   updateOpenLimitsCommand(extensionAPI, limitUid);
@@ -323,13 +340,13 @@ function registerSmartblocksCommands(extensionAPI) {
             context.targetUid,
             await getPageUidByAnyBlockUid(context.targetUid),
             byCategories === "false" ? false : true,
-            asTable === "true" ? true : false
+            asTable === "true" ? true : false,
           );
         else
           totalTimeForGivenPeriod(
             period,
             context.targetUid,
-            asTable === "true" ? true : false
+            asTable === "true" ? true : false,
           );
         return "";
       },
@@ -380,7 +397,7 @@ function correctUidInput(uid) {
   } else {
     simpleIziMessage(
       "Categories or Goals & Limits reference has to be a valid block reference, with or without brackets.",
-      "red"
+      "red",
     );
     return null;
   }
@@ -392,6 +409,19 @@ export default {
     const panelConfig = {
       tabTitle: "Time Tracker",
       settings: [
+        {
+          id: "manageCategoriesButton",
+          name: "Manage categories, goals & limits",
+          description:
+            "Open the manager to create/edit categories, set goals and time limits per category.",
+          action: {
+            type: "button",
+            onClick: () => {
+              openCategoriesManager(extensionAPI, categoriesUID, limitsUID);
+            },
+            content: "Manage categories...",
+          },
+        },
         {
           id: "remoteTime",
           name: "Remote elapsed time",
@@ -587,7 +617,7 @@ export default {
                 durationFormat = evt.target.value;
               splittedDurationFormat = getStringsAroundPlaceHolder(
                 durationFormat,
-                "<d>"
+                "<d>",
               );
               setDurationRegex();
             },
@@ -647,7 +677,7 @@ export default {
       await extensionAPI.settings.set("embeds", false);
     includeEmbeds = extensionAPI.settings.get("embeds");
     categoriesUID = normalizeUID(
-      extensionAPI.settings.get("categoriesSetting")
+      extensionAPI.settings.get("categoriesSetting"),
     );
     if (categoriesUID)
       getBlockAttributes(categoriesUID)
@@ -689,19 +719,19 @@ export default {
     if (extensionAPI.settings.get("totalTitleSetting") == null)
       await extensionAPI.settings.set(
         "totalTitleSetting",
-        "Total time [in current <period>::] **<th>**"
+        "Total time [in current <period>::] **<th>**",
       );
     totalTitle = extensionAPI.settings.get("totalTitleSetting");
     if (extensionAPI.settings.get("totalCatSetting") == null)
       await extensionAPI.settings.set(
         "totalCatSetting",
-        "<category>: **<th>** <limit>"
+        "<category>: **<th>** <limit>",
       );
     totalFormat = extensionAPI.settings.get("totalCatSetting");
     if (extensionAPI.settings.get("limitFormatSetting") == null)
       await extensionAPI.settings.set(
         "limitFormatSetting",
-        "<flag> (<type>: <value>')"
+        "<flag> (<type>: <value>')",
       );
     limitFormat = extensionAPI.settings.get("limitFormatSetting");
     if (extensionAPI.settings.get("autoCopyToClipboard") == null)
@@ -709,13 +739,44 @@ export default {
     autoCopyTotalToClipboard = extensionAPI.settings.get("autoCopyToClipboard");
 
     registerPaletteCommands(extensionAPI);
+    registerSlashCommands();
     registerSmartblocksCommands(extensionAPI);
     getParameters();
+
+    const handleXparserButtonClick = (e) => {
+      const btn = e.target.closest("button.bp3-button");
+      if (!btn) return;
+
+      if (
+        btn.classList.contains("rm-xparser-default-Manage") &&
+        btn.classList.contains("categories")
+      ) {
+        openCategoriesManager(extensionAPI, categoriesUID, limitsUID);
+        return;
+      }
+
+      if (
+        btn.classList.contains("rm-xparser-default-Total") &&
+        btn.classList.contains("dashboard")
+      ) {
+        const { period, referenceDate } = parseDashboardPeriodFromClick(e);
+        openTimeDashboard(extensionAPI, period, referenceDate);
+      }
+    };
+    document.addEventListener("click", handleXparserButtonClick, true);
+    _extensionAPI._xparserButtonClickHandler = handleXparserButtonClick;
+
     console.log("Elapsed Time Calculator loaded.");
   },
   onunload: () => {
     console.log("Elapsed Time Calculator unloaded.");
     if (categoriesUID) removePullWatch(categoriesUID, getCategories);
     if (limitsUID) removePullWatch(limitsUID, getLimits);
+    if (_extensionAPI._xparserButtonClickHandler)
+      document.removeEventListener(
+        "click",
+        _extensionAPI._xparserButtonClickHandler,
+        true,
+      );
   },
 };

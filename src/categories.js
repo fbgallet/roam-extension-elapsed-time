@@ -3,7 +3,9 @@ import {
   clearChildrenTreeCache,
   getChildrenTree,
   getLonguestPageTitleFromUids,
+  getPageUidByTitle,
   getRegexFromArray,
+  resolveReferences,
 } from "./util";
 
 /************************* CATEGORIES STATE **************************/
@@ -11,6 +13,8 @@ export let categoriesArray = [];
 export let categoriesNames = [];
 export let categoriesAsRef = [];
 export let categoriesRegex;
+export let tagCategories = [];
+let _aliasesMap = {};
 
 // Version counter incremented on each getCategories() call.
 // Components can poll this to detect changes.
@@ -22,7 +26,6 @@ export function onCategoriesChange(callback) {
 }
 function notifyCategoriesChange() {
   categoriesVersion++;
-  console.log("[ET] notifyCategoriesChange, version:", categoriesVersion, "listeners:", changeListeners.size);
   changeListeners.forEach((cb) => cb(categoriesVersion));
 }
 
@@ -35,6 +38,7 @@ const TYPE = {
 export class Category {
   constructor(s, uid, refs, f, parent = null) {
     this.name = s.trim();
+    this.displayName = resolveReferences(this.name);
     this.uid = uid;
     this.display = true;
     this.type = this.getType(s.trim());
@@ -44,8 +48,11 @@ export class Category {
     };
     this.time = 0;
     this.format = f;
+    this.aliases = [];
+    this.aliasRefs = []; // resolved UIDs for page-ref aliases
     this.children = [];
     this.parent = parent;
+    this.isTag = false;
     this.ref =
       this.type === "pageRef"
         ? refs.length === 1
@@ -117,11 +124,18 @@ export class Category {
       hasSameAncestor = this.parent.hasSameAncestor(tw);
     return hasSameAncestor;
   }
+  matchesName(name) {
+    const lower = name.toLowerCase();
+    return (
+      this.name.toLowerCase() === lower ||
+      this.aliases.some((a) => a.toLowerCase() === lower)
+    );
+  }
   hasChildrenWithName(name) {
-    return this.children.find((child) => child.name === name) != undefined;
+    return this.children.find((child) => child.matchesName(name)) != undefined;
   }
   getChildrenWithName(name) {
-    return this.children.find((child) => child.name === name);
+    return this.children.find((child) => child.matchesName(name));
   }
 }
 
@@ -136,7 +150,11 @@ export function scanCategories(s, refs, callBack, once) {
   s = s.toLowerCase();
   for (let i = 0; i < categoriesArray.length; i++) {
     const cat = categoriesArray[i];
-    if (refs.includes(cat.uid) || s.includes(cat.name.toLowerCase())) {
+    if (
+      refs.includes(cat.uid) ||
+      s.includes(cat.name.toLowerCase()) ||
+      cat.aliases.some((a) => s.includes(a.toLowerCase()))
+    ) {
       result = callBack(cat, i, -1, result);
       hasCat = true;
       if (once) return result;
@@ -146,7 +164,8 @@ export function scanCategories(s, refs, callBack, once) {
         const subCat = cat.children[j];
         if (
           refs.includes(subCat.uid) ||
-          s.includes(subCat.name.toLowerCase())
+          s.includes(subCat.name.toLowerCase()) ||
+          subCat.aliases.some((a) => s.includes(a.toLowerCase()))
         ) {
           result = callBack(
             subCat,
@@ -155,7 +174,7 @@ export function scanCategories(s, refs, callBack, once) {
             result,
             hasCat,
             tag,
-            subCat.name.toLowerCase()
+            subCat.name.toLowerCase(),
           );
           if (once) return result;
           tag = subCat.name.toLowerCase();
@@ -178,6 +197,7 @@ export function getCategories(parentUid) {
   console.log("[ET] triggerTree length:", triggerTree?.length);
 
   if (triggerTree) {
+    triggerTree = [...triggerTree].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     for (let i = 0; i < triggerTree.length; i++) {
       let w = triggerTree[i];
       let hide = false;
@@ -186,26 +206,27 @@ export function getCategories(parentUid) {
         w.string = w.string.replace("{hide}", "");
       }
       let topTrigger = new Category(w.string, w.uid, w.refs, "");
+      if (topTrigger.name.startsWith("#")) {
+        topTrigger.isTag = true;
+      }
       categoriesArray.push(topTrigger);
       if (w.children) {
         getSubCategories(w.children, topTrigger, hide);
       }
     }
-    categoriesNames = categoriesArray
-      .filter((cat) => cat.type !== "pageRef")
-      .map((cat) => cat.name);
-    categoriesRegex = getRegexFromArray(categoriesNames);
-    categoriesAsRef = categoriesArray
-      .filter((cat) => cat.type === "pageRef")
-      .map((cat) => cat.ref);
+    // Apply cached aliases from settings
+    applyAliasesMap();
+    rebuildDerivedArrays();
   } else {
     categoriesArray.length = 0;
     categoriesNames.length = 0;
     categoriesRegex = null;
+    tagCategories = [];
   }
   notifyCategoriesChange();
 
   function getSubCategories(tree, topTrigger, hideTop) {
+    tree = [...tree].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     for (let j = 0; j < tree.length; j++) {
       let hideSub = false;
       let t = tree[j].string;
@@ -219,7 +240,7 @@ export function getCategories(parentUid) {
         tree[j].uid,
         tree[j].refs,
         format,
-        topTrigger
+        topTrigger,
       );
       topTrigger.children.push(subTrigger);
       categoriesArray.push(subTrigger);
@@ -282,7 +303,7 @@ function getLimitsByTypeAndInterval(type, interval, tree) {
         if (!isNaN(duration)) {
           limitDuration.children.forEach((catRef) => {
             let tw = categoriesArray.find(
-              (item) => item.uid === catRef.string?.slice(2, -2)
+              (item) => item.uid === catRef.string?.slice(2, -2),
             );
             if (tw == undefined)
               tw = searchSubCatByUidOrWord(catRef.string?.slice(2, -2), "uid");
@@ -364,6 +385,76 @@ export function saveLimitToSettings(extensionAPI, categoryUid, limitConfig) {
       }
     });
   }
+}
+
+/*======================================================================================================*/
+/* ALIASES                                                                                              */
+/*======================================================================================================*/
+
+function applyAliasesMap() {
+  categoriesArray.forEach((cat) => {
+    cat.aliases = _aliasesMap[cat.uid] || [];
+  });
+}
+
+function rebuildDerivedArrays() {
+  const pageOrTagRegex = /^#?(\[\[.*\]\])$|^#[^\s]+$/;
+
+  // Category names + text aliases → regex
+  const names = [];
+  categoriesArray.forEach((cat) => {
+    if (cat.type !== "pageRef") names.push(cat.name);
+    // Resolve page-ref aliases to UIDs; collect text aliases for regex
+    cat.aliasRefs = [];
+    cat.aliases.forEach((a) => {
+      if (pageOrTagRegex.test(a)) {
+        const title = a.replace(/^#?\[\[|\]\]$/g, "").replace(/^#/, "");
+        const uid = getPageUidByTitle(title);
+        if (uid) cat.aliasRefs.push(uid);
+      } else {
+        names.push(a);
+      }
+    });
+  });
+  categoriesNames = names;
+  categoriesRegex = names.length ? getRegexFromArray(names) : null;
+
+  // Page refs: own refs + alias refs
+  categoriesAsRef = [
+    ...categoriesArray
+      .filter((cat) => cat.type === "pageRef")
+      .map((cat) => cat.ref),
+    ...categoriesArray.flatMap((cat) => cat.aliasRefs),
+  ];
+
+  tagCategories = categoriesArray.filter((cat) => cat.isTag);
+}
+
+export function getCategoryAliasesMap(extensionAPI) {
+  return extensionAPI.settings.get("categoryAliases") || {};
+}
+
+export function saveCategoryAliases(extensionAPI, uid, aliases) {
+  const map = extensionAPI.settings.get("categoryAliases") || {};
+  if (aliases && aliases.length > 0) map[uid] = aliases;
+  else delete map[uid];
+  extensionAPI.settings.set("categoryAliases", map);
+
+  // Update cached map and in-memory Category
+  _aliasesMap = map;
+  const cat =
+    categoriesArray.find((c) => c.uid === uid) ||
+    searchSubCatByUidOrWord(uid, "uid");
+  if (cat) cat.aliases = aliases || [];
+
+  // Rebuild regex/refs to include new aliases
+  rebuildDerivedArrays();
+}
+
+export function loadAliasesFromSettings(extensionAPI) {
+  _aliasesMap = extensionAPI.settings.get("categoryAliases") || {};
+  applyAliasesMap();
+  rebuildDerivedArrays();
 }
 
 export function migrateLimitsFromBlocks(limitsUid, extensionAPI) {

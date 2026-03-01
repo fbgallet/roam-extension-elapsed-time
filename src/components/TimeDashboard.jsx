@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import renderOverlay from "roamjs-components/util/renderOverlay";
+import { renderOverlay } from "./renderOverlay";
 import { Chart, registerables } from "chart.js";
 import { categoriesArray, onCategoriesChange } from "../categories";
 import {
@@ -11,6 +11,7 @@ import {
   formatDateLabel,
 } from "../dashboardData";
 import { convertMinutesTohhmm } from "../util";
+import { getCategoryColorsMap } from "./CategoriesManager";
 
 Chart.register(...registerables);
 
@@ -24,6 +25,44 @@ const CHART_COLORS = [
   "#DB2C6F",
   "#667580",
 ];
+
+/*──────────────────────────────────────────────────────────────────────────────
+  Color utilities for tinted child bars
+──────────────────────────────────────────────────────────────────────────────*/
+function hexToRgb(hex) {
+  const h = hex.replace("#", "");
+  return [
+    parseInt(h.slice(0, 2), 16),
+    parseInt(h.slice(2, 4), 16),
+    parseInt(h.slice(4, 6), 16),
+  ];
+}
+
+function rgbToHex(r, g, b) {
+  return "#" + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+}
+
+/** Blend color toward white by factor (0=original, 1=white) */
+function lightenColor(hex, factor) {
+  const [r, g, b] = hexToRgb(hex);
+  return rgbToHex(r + (255 - r) * factor, g + (255 - g) * factor, b + (255 - b) * factor);
+}
+
+/**
+ * Given a parent color and number of children, return an array of
+ * progressively lighter tints for each child.
+ * childIndex 0 = slightly lighter than parent, last = most light.
+ */
+function childTintColor(parentColor, childIndex, totalChildren) {
+  // Range: lighten 25% to 65% depending on position
+  const minLighten = 0.25;
+  const maxLighten = 0.65;
+  const factor =
+    totalChildren === 1
+      ? (minLighten + maxLighten) / 2
+      : minLighten + (childIndex / (totalChildren - 1)) * (maxLighten - minLighten);
+  return lightenColor(parentColor, factor);
+}
 
 const PRESETS = [
   { key: "day", label: "Today" },
@@ -171,9 +210,12 @@ function presetToInterval(preset) {
 /*──────────────────────────────────────────────────────────────────────────────
   TotalsCategoryRow — recursive row with horizontal bar
 ──────────────────────────────────────────────────────────────────────────────*/
-const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle, interval }) => {
+const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle, interval, fixedColors, catColor }) => {
   const time = totals[cat.uid] || 0;
   if (time === 0) return null;
+
+  // Resolve this category's color: fixed > passed-in > fallback gray
+  const color = fixedColors?.[cat.uid] || catColor || "#2965CC";
 
   const hasChildren = cat.children?.length > 0;
   const isExpanded = expandedSet.has(cat.uid);
@@ -189,7 +231,8 @@ const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle,
     : [];
   const isStacked = depth === 0 && activeChildren.length > 0;
 
-  // Segments: one per active child, plus a remainder for parent's own time
+  // Segments: one per active child, plus a remainder for parent's own time.
+  // Children use tinted variants of parent color (or their own fixed color).
   let segments = null;
   if (isStacked) {
     const childrenTotal = activeChildren.reduce(
@@ -199,13 +242,14 @@ const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle,
     const ownTime = Math.max(time - childrenTotal, 0);
     segments = [
       ...(ownTime > 0
-        ? [{ uid: cat.uid + "_own", time: ownTime, color: "#2965CC" }]
+        ? [{ uid: cat.uid + "_own", time: ownTime, color }]
         : []),
       ...activeChildren.map((child, i) => ({
         uid: child.uid,
         name: child.name,
         time: totals[child.uid],
-        color: CHART_COLORS[(i + 1) % CHART_COLORS.length],
+        color: fixedColors?.[child.uid] || childTintColor(color, i, activeChildren.length),
+        borderColor: color,
       })),
     ];
   }
@@ -226,21 +270,33 @@ const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle,
         <span className="et-totals-name">{cat.name}</span>
         <span className="et-totals-bar-container">
           {isStacked ? (
-            segments.map((seg) => (
-              <span
-                key={seg.uid}
-                className="et-totals-bar et-totals-bar-segment"
-                style={{
-                  width: `${(seg.time / maxTime) * 100}%`,
-                  backgroundColor: seg.color,
-                }}
-                title={seg.name ? `${seg.name}: ${convertMinutesTohhmm(seg.time)}` : undefined}
-              />
-            ))
+            <span
+              className="et-totals-bar-inner"
+              style={{ width: `${barWidth}%`, outline: depth === 0 ? `1.5px solid ${color}` : undefined, outlineOffset: "-1px", borderRadius: 3 }}
+            >
+              {segments.map((seg) => (
+                <span
+                  key={seg.uid}
+                  className="et-totals-bar et-totals-bar-segment"
+                  style={{
+                    width: `${(seg.time / time) * 100}%`,
+                    backgroundColor: seg.color,
+                    ...(seg.borderColor ? { boxShadow: `inset 0 0 0 1px ${seg.borderColor}` } : {}),
+                  }}
+                  title={seg.name ? `${seg.name}: ${convertMinutesTohhmm(seg.time)}` : undefined}
+                />
+              ))}
+            </span>
           ) : (
             <span
               className="et-totals-bar"
-              style={{ width: `${barWidth}%` }}
+              style={{
+                width: `${barWidth}%`,
+                backgroundColor: color,
+                outline: depth === 0 ? `1.5px solid ${color}` : undefined,
+                outlineOffset: "-1px",
+                borderRadius: 3,
+              }}
             />
           )}
           {goalTime > 0 && maxTime > 0 && (
@@ -262,7 +318,7 @@ const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle,
       </div>
       {isExpanded &&
         hasChildren &&
-        cat.children.map((child) => (
+        cat.children.map((child, ci) => (
           <TotalsCategoryRow
             key={child.uid}
             cat={child}
@@ -272,6 +328,8 @@ const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle,
             expandedSet={expandedSet}
             onToggle={onToggle}
             interval={interval}
+            fixedColors={fixedColors}
+            catColor={fixedColors?.[child.uid] || childTintColor(color, ci, cat.children.length)}
           />
         ))}
     </>
@@ -279,10 +337,35 @@ const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle,
 };
 
 /*──────────────────────────────────────────────────────────────────────────────
+  buildTotalsClipboardText — tab-separated list matching copyTotalToClipboard
+──────────────────────────────────────────────────────────────────────────────*/
+function buildTotalsClipboardText(data) {
+  let lines = [];
+  const walk = (cats, shift = "") => {
+    cats.forEach((cat) => {
+      const time = data.totals[cat.uid] || 0;
+      if (time === 0) return;
+      lines.push(`${shift}${cat.name}\t${convertMinutesTohhmm(time)}`);
+      if (cat.children?.length) walk(cat.children, shift + "   ");
+    });
+  };
+  walk(data.categories);
+  if (data.uncategorized.total > 0)
+    lines.push(`Uncategorized\t${convertMinutesTohhmm(data.uncategorized.total)}`);
+  const activeTags = (data.tags || []).filter((t) => (data.totals[t.uid] || 0) > 0);
+  activeTags.forEach((t) =>
+    lines.push(`${t.name}\t${convertMinutesTohhmm(data.totals[t.uid])}`)
+  );
+  lines.push(`Total\t${convertMinutesTohhmm(data.grandTotal)}`);
+  return lines.join("\n");
+}
+
+/*──────────────────────────────────────────────────────────────────────────────
   TotalsView
 ──────────────────────────────────────────────────────────────────────────────*/
-const TotalsView = ({ data, preset }) => {
+const TotalsView = ({ data, preset, fixedColors }) => {
   const [expandedSet, setExpandedSet] = useState(() => new Set());
+  const [copied, setCopied] = useState(false);
   const interval = presetToInterval(preset);
 
   const handleToggle = useCallback((uid) => {
@@ -292,6 +375,14 @@ const TotalsView = ({ data, preset }) => {
       return next;
     });
   }, []);
+
+  const handleCopy = useCallback(() => {
+    const text = buildTotalsClipboardText(data);
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [data]);
 
   if (!data) return <p className="et-empty-message">Loading...</p>;
   if (data.grandTotal === 0)
@@ -303,14 +394,23 @@ const TotalsView = ({ data, preset }) => {
     data.uncategorized.total
   );
 
+  const activeTags = (data.tags || []).filter((t) => (data.totals[t.uid] || 0) > 0);
+
   return (
     <div className="et-totals-view">
       <div className="et-totals-header">
         <span className="et-totals-grand">
           Total: {convertMinutesTohhmm(data.grandTotal)}
         </span>
+        <button
+          className={`bp3-button bp3-small bp3-minimal et-copy-btn${copied ? " et-copy-btn-done" : ""}`}
+          onClick={handleCopy}
+          title="Copy totals to clipboard"
+        >
+          {copied ? "✓ Copied" : "Copy"}
+        </button>
       </div>
-      {data.categories.map((cat) => (
+      {data.categories.map((cat, i) => (
         <TotalsCategoryRow
           key={cat.uid}
           cat={cat}
@@ -320,16 +420,13 @@ const TotalsView = ({ data, preset }) => {
           expandedSet={expandedSet}
           onToggle={handleToggle}
           interval={interval}
+          fixedColors={fixedColors}
+          catColor={fixedColors?.[cat.uid] || CHART_COLORS[i % CHART_COLORS.length]}
         />
       ))}
       {data.uncategorized.total > 0 && (
         <div className="et-totals-row et-totals-top" style={{ paddingLeft: 8 }}>
-          <span
-            className="et-expand-arrow"
-            style={{ visibility: "hidden" }}
-          >
-            ▸
-          </span>
+          <span className="et-expand-arrow" style={{ visibility: "hidden" }}>▸</span>
           <span className="et-totals-name" style={{ fontStyle: "italic" }}>
             Uncategorized
           </span>
@@ -344,6 +441,25 @@ const TotalsView = ({ data, preset }) => {
           <span className="et-totals-time">
             {convertMinutesTohhmm(data.uncategorized.total)}
           </span>
+        </div>
+      )}
+      {activeTags.length > 0 && (
+        <div className="et-tags-section">
+          <div className="et-tags-section-header">Tags</div>
+          {activeTags.map((tag) => {
+            const time = data.totals[tag.uid] || 0;
+            const barWidth = maxTime > 0 ? Math.max((time / maxTime) * 100, 2) : 0;
+            return (
+              <div key={tag.uid} className="et-totals-row et-totals-tag" style={{ paddingLeft: 8 }}>
+                <span className="et-expand-arrow" style={{ visibility: "hidden" }}>▸</span>
+                <span className="et-totals-name et-tag-name">{tag.name}</span>
+                <span className="et-totals-bar-container">
+                  <span className="et-totals-bar et-totals-bar-tag" style={{ width: `${barWidth}%` }} />
+                </span>
+                <span className="et-totals-time">{convertMinutesTohhmm(time)}</span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -404,7 +520,7 @@ const CategoryPickerNode = ({ cat, depth, selected, onToggle, colorMap, expanded
   );
 };
 
-const CategoryPicker = ({ categories, totals, selected, onSelectionChange }) => {
+const CategoryPicker = ({ categories, tags, totals, selected, onSelectionChange, colorMap }) => {
   const [expandedSet, setExpandedSet] = useState(() => new Set());
 
   const handleToggle = (uid) => {
@@ -421,17 +537,6 @@ const CategoryPicker = ({ categories, totals, selected, onSelectionChange }) => 
     });
   };
 
-  // Assign colors to selected categories
-  const colorMap = useMemo(() => {
-    const map = {};
-    let i = 0;
-    for (const uid of selected) {
-      map[uid] = CHART_COLORS[i % CHART_COLORS.length];
-      i++;
-    }
-    return map;
-  }, [selected]);
-
   const handleSelectAll = () => {
     const allUids = new Set();
     const collectUids = (cats) => {
@@ -441,26 +546,19 @@ const CategoryPicker = ({ categories, totals, selected, onSelectionChange }) => 
       });
     };
     collectUids(categories);
+    collectUids(tags || []);
     onSelectionChange(allUids);
   };
 
   const handleSelectNone = () => onSelectionChange(new Set());
 
+  const activeTags = (tags || []).filter((t) => (totals[t.uid] || 0) > 0);
+
   return (
     <div className="et-category-picker">
       <div className="et-picker-actions">
-        <button
-          className="bp3-button bp3-minimal bp3-small"
-          onClick={handleSelectAll}
-        >
-          All
-        </button>
-        <button
-          className="bp3-button bp3-minimal bp3-small"
-          onClick={handleSelectNone}
-        >
-          None
-        </button>
+        <button className="bp3-button bp3-minimal bp3-small" onClick={handleSelectAll}>All</button>
+        <button className="bp3-button bp3-minimal bp3-small" onClick={handleSelectNone}>None</button>
       </div>
       <div className="et-picker-list">
         {categories.map((cat) => (
@@ -475,6 +573,27 @@ const CategoryPicker = ({ categories, totals, selected, onSelectionChange }) => 
             onToggleExpand={handleToggleExpand}
           />
         ))}
+        {activeTags.length > 0 && (
+          <>
+            <div className="et-picker-section-label">Tags</div>
+            {activeTags.map((tag) => (
+              <div key={tag.uid} className="et-picker-row et-picker-tag-row" style={{ paddingLeft: 4 }}>
+                <span className="et-expand-arrow" style={{ visibility: "hidden" }}>▸</span>
+                <label className="et-picker-label">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(tag.uid)}
+                    onChange={() => handleToggle(tag.uid)}
+                  />
+                  {colorMap[tag.uid] && (
+                    <span className="et-color-swatch" style={{ backgroundColor: colorMap[tag.uid] }} />
+                  )}
+                  <span className="et-picker-name et-tag-name">{tag.name}</span>
+                </label>
+              </div>
+            ))}
+          </>
+        )}
       </div>
       {selected.size > 6 && (
         <div className="et-picker-warning">
@@ -493,6 +612,50 @@ const GRANULARITIES = [
 ];
 
 /*──────────────────────────────────────────────────────────────────────────────
+  buildTrendsCSV — CSV export for the trends chart data
+──────────────────────────────────────────────────────────────────────────────*/
+function buildTrendsCSV(data, selected, granularity) {
+  const allCats = flattenCategories([...data.categories, ...(data.tags || [])]);
+  const selectedCats = allCats.filter((c) => selected.has(c.uid));
+
+  let labels, bucketKeys, bucketData;
+  const days = data.days;
+  if (granularity === "month" || granularity === "quarter") {
+    const agg = aggregateByMonth(data.matrix, days);
+    labels = agg.labels;
+    bucketKeys = Object.keys(agg.aggregated);
+    bucketData = agg.aggregated;
+  } else if (granularity === "week") {
+    const agg = aggregateByWeek(data.matrix, days);
+    labels = agg.labels;
+    bucketKeys = Object.keys(agg.aggregated);
+    bucketData = agg.aggregated;
+  } else {
+    labels = days.map((uid) => {
+      const title = window.roamAlphaAPI.pull("[:node/title]", [":block/uid", uid])?.[":node/title"];
+      if (!title) return uid;
+      const date = window.roamAlphaAPI.util.pageTitleToDate(title);
+      return date ? formatDateLabel(date) : title;
+    });
+    bucketKeys = days;
+    bucketData = data.matrix;
+  }
+
+  const header = ["Period", ...selectedCats.map((c) => c.name), "Total"].join(",");
+  const rows = bucketKeys.map((key, i) => {
+    const dayData = bucketData[key] || {};
+    const values = selectedCats.map((c) => dayData[c.uid] || 0);
+    const rowTotal = values.reduce((a, b) => a + b, 0);
+    return [
+      `"${labels[i]}"`,
+      ...values.map((v) => convertMinutesTohhmm(v)),
+      convertMinutesTohhmm(rowTotal),
+    ].join(",");
+  });
+  return [header, ...rows].join("\n");
+}
+
+/*──────────────────────────────────────────────────────────────────────────────
   TrendChart — Chart.js stacked/grouped bar chart
 ──────────────────────────────────────────────────────────────────────────────*/
 const TrendChart = ({ data, selected, colorMap, granularity }) => {
@@ -503,7 +666,7 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
     if (!canvasRef.current || !data) return;
 
     const days = data.days;
-    const allCats = flattenCategories(data.categories);
+    const allCats = flattenCategories([...data.categories, ...(data.tags || [])]);
 
     // Determine bucket data based on chosen granularity
     let labels, bucketKeys, bucketData;
@@ -553,21 +716,38 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
         if (cat.children?.length) walkForStackGroups(cat.children);
       }
     };
-    walkForStackGroups(data.categories);
+    walkForStackGroups([...data.categories, ...(data.tags || [])]);
 
     // All child uids already rendered as part of a parent's stack group.
     // These must NOT be rendered again as standalone bars.
     const stackedChildUids = new Set([...stackGroups.values()].flat());
 
-    // Build datasets
+    // Build datasets — use colorMap prop (which already accounts for fixed colors)
     const datasets = [];
-    let colorIndex = 0;
     const uidColorMap = {};
 
-    // Assign colors in selection order
+    // Assign colors: use prop colorMap when available, fallback to CHART_COLORS
+    // Assign base colors to top-level (non-stacked-child) categories only
+    let colorIndex = 0;
     for (const uid of selectedSet) {
-      uidColorMap[uid] = CHART_COLORS[colorIndex % CHART_COLORS.length];
+      if (stackedChildUids.has(uid)) continue; // child tints computed later
+      uidColorMap[uid] = colorMap[uid] || CHART_COLORS[colorIndex % CHART_COLORS.length];
       colorIndex++;
+    }
+
+    // Assign tinted colors to stacked children based on their parent's color.
+    // Use wider lightening range and start darker so tiers are clearly distinct.
+    for (const [parentUid, childUids] of stackGroups) {
+      const parentColor = uidColorMap[parentUid];
+      childUids.forEach((cuid, ci) => {
+        uidColorMap[cuid] = colorMap[cuid] || childTintColor(parentColor, ci, childUids.length);
+      });
+    }
+
+    // stackBorderColors: parentUid → parentColor (for post-draw border plugin)
+    const stackBorderColors = {};
+    for (const [parentUid] of stackGroups) {
+      stackBorderColors[parentUid] = uidColorMap[parentUid];
     }
 
     for (const uid of selectedSet) {
@@ -579,10 +759,9 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
 
       if (stackGroups.has(uid)) {
         // This parent has selected children → render as stacked group.
-        // stack key = parent uid so siblings in this group share a bar.
         const childUids = stackGroups.get(uid);
 
-        // Parent's own segment = parent total minus selected children totals
+        // Parent's own segment (bottom of stack)
         datasets.push({
           label: cat?.name || uid,
           data: bucketKeys.map((key) => {
@@ -599,7 +778,7 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
           stack: uid,
         });
 
-        // One dataset per selected child, same stack group
+        // One dataset per selected child — tinted, no individual borders
         childUids.forEach((cuid, ci) => {
           const childCat = allCats.find((c) => c.uid === cuid);
           datasets.push({
@@ -612,18 +791,57 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
           });
         });
       } else {
-        // Standalone category — give it its own unique stack id so it is
-        // rendered as a separate grouped bar and never merged with others.
+        // Standalone category bar
         datasets.push({
           label: cat?.name || uid,
           data: bucketKeys.map((key) => bucketData[key]?.[uid] || 0),
           backgroundColor: color,
           borderWidth: 0,
           borderRadius: 2,
-          stack: uid, // unique stack id → own bar column
+          stack: uid,
         });
       }
     }
+
+    // Plugin: draw a 2px border on left+right sides of each stacked group bar,
+    // using the parent category's color. This visually "frames" the stack column
+    // without the messy per-segment borders Chart.js would otherwise produce.
+    const stackedGroupBorderPlugin = {
+      id: "stackedGroupBorder",
+      afterDatasetsDraw(chart) {
+        if (!Object.keys(stackBorderColors).length) return;
+        const { ctx } = chart;
+        ctx.save();
+
+        // For each dataset that belongs to a stack group (stack key = parentUid),
+        // find bars and draw left+right borders in the parent color.
+        chart.data.datasets.forEach((ds, dsIndex) => {
+          const parentColor = stackBorderColors[ds.stack];
+          if (!parentColor) return;
+          const meta = chart.getDatasetMeta(dsIndex);
+          if (!meta || meta.hidden) return;
+          meta.data.forEach((bar) => {
+            if (!bar || bar.base === bar.y) return; // zero-height segment
+            const { x, y, width, base } = bar;
+            const left = x - width / 2;
+            const top = Math.min(y, base);
+            const height = Math.abs(base - y);
+            ctx.strokeStyle = parentColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            // left side
+            ctx.moveTo(left + 1, top);
+            ctx.lineTo(left + 1, top + height);
+            // right side
+            ctx.moveTo(left + width - 1, top);
+            ctx.lineTo(left + width - 1, top + height);
+            ctx.stroke();
+          });
+        });
+
+        ctx.restore();
+      },
+    };
 
     // Build goal/limit reference lines for selected categories
     const limitLines = [];
@@ -672,7 +890,7 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
     chartRef.current = new Chart(canvasRef.current, {
       type: "bar",
       data: { labels, datasets },
-      plugins: [limitLinesPlugin],
+      plugins: [limitLinesPlugin, stackedGroupBorderPlugin],
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -715,7 +933,7 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
         chartRef.current = null;
       }
     };
-  }, [data, selected, granularity]);
+  }, [data, selected, granularity, colorMap]);
 
   if (!data)
     return <p className="et-empty-message">Loading...</p>;
@@ -746,16 +964,79 @@ function flattenCategories(categories) {
 }
 
 /*──────────────────────────────────────────────────────────────────────────────
+  TrendsView — trends tab with category picker, granularity switcher, chart,
+  and CSV copy button
+──────────────────────────────────────────────────────────────────────────────*/
+const TrendsView = ({ data, selected, setSelected, colorMap, granularity, setGranularity }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCSV = useCallback(() => {
+    if (!data || selected.size === 0) return;
+    const csv = buildTrendsCSV(data, selected, granularity);
+    navigator.clipboard.writeText(csv).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [data, selected, granularity]);
+
+  return (
+    <div className="et-trends-layout">
+      <CategoryPicker
+        categories={data?.categories || []}
+        tags={data?.tags || []}
+        totals={data?.totals || {}}
+        selected={selected}
+        onSelectionChange={setSelected}
+        colorMap={colorMap}
+      />
+      <div className="et-trends-chart-area">
+        <div className="et-granularity-switcher">
+          <span className="et-granularity-label">Group by:</span>
+          <div className="bp3-button-group bp3-small">
+            {GRANULARITIES.map((g) => (
+              <button
+                key={g.key}
+                className={`bp3-button${granularity === g.key ? " bp3-active bp3-intent-primary" : ""}`}
+                onClick={() => setGranularity(g.key)}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+          <button
+            className={`bp3-button bp3-small bp3-minimal et-copy-btn${copied ? " et-copy-btn-done" : ""}`}
+            onClick={handleCopyCSV}
+            disabled={selected.size === 0}
+            title="Copy chart data as CSV"
+          >
+            {copied ? "✓ Copied" : "Copy CSV"}
+          </button>
+        </div>
+        <TrendChart
+          data={data}
+          selected={selected}
+          colorMap={colorMap}
+          granularity={granularity}
+        />
+      </div>
+    </div>
+  );
+};
+
+/*──────────────────────────────────────────────────────────────────────────────
   TimeDashboard — main modal
 ──────────────────────────────────────────────────────────────────────────────*/
-const TimeDashboard = ({ onClose }) => {
+const VALID_PERIODS = new Set(["day", "week", "month", "quarter"]);
+
+const TimeDashboard = ({ onClose, extensionAPI, initialPeriod, initialReferenceDate }) => {
   const [isOpen, setIsOpen] = useState(true);
   const [activeTab, setActiveTab] = useState("totals");
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [period, setPeriod] = useState(() => {
-    const { startDate, endDate } = getDateRange("day");
-    return { preset: "day", startDate, endDate };
+    const preset = VALID_PERIODS.has(initialPeriod) ? initialPeriod : "day";
+    const { startDate, endDate } = getDateRange(preset, initialReferenceDate);
+    return { preset, startDate, endDate };
   });
   const [selected, setSelected] = useState(new Set());
   const [granularity, setGranularity] = useState("day");
@@ -795,16 +1076,26 @@ const TimeDashboard = ({ onClose }) => {
     onClose?.();
   };
 
+  // Fixed colors from settings (user-assigned in CategoriesManager)
+  const fixedColors = useMemo(
+    () => (extensionAPI ? getCategoryColorsMap(extensionAPI) : {}),
+    [extensionAPI]
+  );
+
   // Color map for selected categories (shared between picker and chart)
   const colorMap = useMemo(() => {
     const map = {};
     let i = 0;
     for (const uid of selected) {
-      map[uid] = CHART_COLORS[i % CHART_COLORS.length];
+      if (fixedColors[uid]) {
+        map[uid] = fixedColors[uid];
+      } else {
+        map[uid] = CHART_COLORS[i % CHART_COLORS.length];
+      }
       i++;
     }
     return map;
-  }, [selected]);
+  }, [selected, fixedColors]);
 
   if (!isOpen) return null;
 
@@ -856,39 +1147,17 @@ const TimeDashboard = ({ onClose }) => {
               </button>
             </div>
 
-            {!loading && activeTab === "totals" && <TotalsView data={data} preset={period.preset} />}
+            {!loading && activeTab === "totals" && <TotalsView data={data} preset={period.preset} fixedColors={fixedColors} />}
 
             {!loading && activeTab === "trends" && (
-              <div className="et-trends-layout">
-                <CategoryPicker
-                  categories={data?.categories || []}
-                  totals={data?.totals || {}}
-                  selected={selected}
-                  onSelectionChange={setSelected}
-                />
-                <div className="et-trends-chart-area">
-                  <div className="et-granularity-switcher">
-                    <span className="et-granularity-label">Group by:</span>
-                    <div className="bp3-button-group bp3-small">
-                      {GRANULARITIES.map((g) => (
-                        <button
-                          key={g.key}
-                          className={`bp3-button${granularity === g.key ? " bp3-active bp3-intent-primary" : ""}`}
-                          onClick={() => setGranularity(g.key)}
-                        >
-                          {g.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <TrendChart
-                    data={data}
-                    selected={selected}
-                    colorMap={colorMap}
-                    granularity={granularity}
-                  />
-                </div>
-              </div>
+              <TrendsView
+                data={data}
+                selected={selected}
+                setSelected={setSelected}
+                colorMap={colorMap}
+                granularity={granularity}
+                setGranularity={setGranularity}
+              />
             )}
           </div>
           <div className="bp3-dialog-footer">
@@ -910,9 +1179,16 @@ const TimeDashboard = ({ onClose }) => {
 /*──────────────────────────────────────────────────────────────────────────────
   Launcher
 ──────────────────────────────────────────────────────────────────────────────*/
-export function openTimeDashboard() {
+export function openTimeDashboard(extensionAPI, initialPeriod, initialReferenceDate) {
   renderOverlay({
-    Overlay: (props) => <TimeDashboard {...props} />,
+    Overlay: (props) => (
+      <TimeDashboard
+        {...props}
+        extensionAPI={extensionAPI}
+        initialPeriod={initialPeriod}
+        initialReferenceDate={initialReferenceDate}
+      />
+    ),
   });
 }
 

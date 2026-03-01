@@ -2,7 +2,7 @@
 
 Easily **track the time spent on your activities and calculate the total time spent on them**, organized by categories and sub-categories (and so on), and see if predefined **limits or goals** are respected. Helps to implement **interstitial journaling**.
 
-Review total by day, week, month, quarter, year, or any given period of time.
+Review total by day, week, month, quarter, year, or any given period of time. Visualize trends over time with the built-in **Time Dashboard**.
 
 see [changelog here](https://github.com/fbgallet/roam-extension-elapsed-time/blob/main/CHANGELOG.md)
 
@@ -14,6 +14,8 @@ see [changelog here](https://github.com/fbgallet/roam-extension-elapsed-time/blo
 
 All commands in command palette (Ctrl/Cmd + p) begin with "Time tracker: " and you can set custom hotkeys for each of them.
 
+A `/Time tracker` **slash command** is also available directly in any block — type `/tra` to quickly trigger it and insert a timestamp or calculate elapsed time without leaving the editor.
+
 ### Elapsed time
 
 Calculate and insert elapsed time between two timestamp. The `Elapsed time` command has different behaviors depending on the context:
@@ -22,9 +24,9 @@ Calculate and insert elapsed time between two timestamp. The `Elapsed time` comm
 - if it contains already two timestamps, the elapsed time will be (re)calculated,
 - if there is no timestamp (or a Smartblock button for a timestamp), a timestamp (now) will be inserted,
 
-💡 If you set hotkeys for this command, **it will very easy, with the same hotkeys**, to insert a first timestamp, then insert the second and get the elapsed time.
+💡 If you set hotkeys for this command, **it will be very easy, with the same hotkeys**, to insert a first timestamp, then insert the second and get the elapsed time.
 
-💥 with `Remote elapsed time` enabled (by default), if there is no timestamp in current block, a timestamp to be completed with a second one is searched in the previous sibbling block. So that the elapsed time will be calculated in the remote block. The now timestamp will also be inserted in the current block. This way, you need to press the hotkeys only one time to both calculate previous elapsed time and set the begin timestamp for the next activity, which makes interstitial journaling as seamless as possible.
+💥 with `Remote elapsed time` enabled (by default), if there is no timestamp in current block, a timestamp to be completed with a second one is searched in the previous sibbling block. So that the elapsed time will be calculated in the remote block. The now timestamp will also be inserted in the current block. This way, you need to use the '/tra' slash command or to press the hotkeys only one time to both calculate previous elapsed time and set the begin timestamp for the next activity, which makes interstitial journaling as seamless as possible!
 
 Another way to insert easily timestamps and run this command is to use SmartBlocks command. For instructions, see 'SmartBlocks commands' section below.
 
@@ -34,9 +36,9 @@ The flags are customizable (🎯,⚠️,👍,🛑 by default), you can change th
 
 ### Total time
 
-Total is calculated as the sum of elapsed times (⚠️ formated by Time tracker, double timestamps without calculated elapsed time are not taken into account!) and pomodoros (if no elapsed time in the block, and whether or not they have been completed). 🆕 New in v.4: Embedded blocks can optionally be taken into account (not if the orginal blocks are on the same page as the embeds).
+Total is calculated as the sum of elapsed times (⚠️ formated by Time tracker, double timestamps without calculated elapsed time are not taken into account!) and pomodoros (if no elapsed time in the block, and whether or not they have been completed). Embedded blocks can optionally be taken into account (not if the orginal blocks are on the same page as the embeds).
 
-It is displayed in a customizable format (ex: `category: **30'**` with time expressed in minutes with `<tm>` placeholder, or hours and minutes with `<th>` or decimal hours with `<td>`). All totals and subtotals will be displayed in a basic outline of blocks by default, but cat also be displayed in Roam {{table}} and is copied in the clipboard in a simple text format. A development envisaged for a later version is to propose a dynamic table and a graphic visualization of the data.
+It is displayed in a customizable format (ex: `category: **30'**` with time expressed in minutes with `<tm>` placeholder, or hours and minutes with `<th>` or decimal hours with `<td>`). All totals and subtotals will be displayed in a basic outline of blocks by default, but can also be displayed in Roam {{table}} and is copied in the clipboard in a simple text format.
 
 Total can be calculated in different range of data or periods, depending on the command used:
 
@@ -47,8 +49,8 @@ Total can be calculated in different range of data or periods, depending on the 
 - `simple total in context (sibbling/children blocks)`: only total is calcultated (without taking into account the categories), only in a subset of the page:
   - if the command is executed in a block with children, the calculation will be done on all children and their children,
   - otherwise, it will concern the sibbling blocks and their children.
-- `total for current page and all its references`: if you don't need to include references of the current page, use the previous command. This command browses all linked references of the current page, not only those that directly contain an elapsed time, but also those that could contain it in their children (experimental, may not be always accurate).
-- 🆕 New in v.4 `total for current page and all its references`: browses all children and all linked references of the focused block, not only those that directly contain an elapsed time, but also those that could contain it in their children (warning: a given elapsed time can be added twice if it's a children of another linked reference of the same block)
+- `total for current page and all its references`: browses all linked references of the current page, not only those that directly contain an elapsed time, but also those that could contain it in their children (experimental, may not be always accurate).
+- `total for current block and all its references`: browses all children and all linked references of the focused block (warning: a given elapsed time can be added twice if it's a children of another linked reference of the same block).
 
 For any of these commands,
 
@@ -56,20 +58,66 @@ For any of these commands,
 - if the cursor is in a block with children, total and total by categories will be inserted as the last children, and a block reference to the total will be inserted in the current block
 - if no block is selected, the total will be inserted as the last block of the page
 
-## Categories, goals and limits configuration:
+## 🆕 Time Dashboard
+
+The **Time Dashboard** is an interactive dialog that gives you a visual overview of your tracked time. Open it with the command `Time Tracker: Open Dashboard` or via the `{{Time Tracker/Total dashboard}}` button (see below).
+
+### Totals tab
+
+Shows a horizontal bar chart for each category over the selected period. Top-level categories display a **stacked bar** breaking down their subcategories. Goal and limit markers are shown on the bars so you can see at a glance whether you are on track. Click the expand arrow (▸) next to a category to drill down into its subcategories.
+
+### Trends tab
+
+Shows time per category over time as a **stacked bar chart**. Select which categories to display using the checkbox tree on the left. Use the **Group by** switcher to aggregate data by day, week, month, or quarter. Goal and limit reference lines are drawn on the chart for each selected category.
+
+### Period selector
+
+Use the preset buttons (Today / This Week / This Month / This Quarter) or pick a **Custom** date range. Navigate backward and forward with the ‹ › arrows.
+
+### Opening the dashboard from a Roam button
+
+You can place a native Roam button in any block or template to open the dashboard directly:
+
+```
+{{Time Tracker/Total dashboard}}
+{{Time Tracker/Total dashboard:week}}
+```
+
+The optional period suffix (`:day`, `:week`, `:month`, `:quarter`) sets the initial period shown when the dialog opens. If the button is placed on a **past daily note**, the dashboard will automatically open relative to that date (e.g., `{{Time Tracker/Total dashboard:week}}` on last Monday's daily note will open the dashboard showing that week).
+
+## 🆕 Categories, goals & limits manager
+
+Instead of editing Roam blocks directly, you can now manage all your categories, subcategories, goals, limits, aliases and chart colors from a single **graphical dialog**.
+
+Open it from:
+
+- The **"Manage categories..."** button at the top of the extension settings panel, or
+- The command `Time Tracker: Manage categories, goals & limits`, or
+- A native Roam button: `{{Time Tracker/Manage categories}}`
+
+### What you can do in the manager
+
+- **Add** top-level categories or subcategories with the inline form
+- **Rename** any category by clicking its name or the ✎ pencil icon
+- **Delete** a category (with confirmation) — this also removes it from your Roam graph
+- **Set goals and limits** per interval (task, day, week, month) directly in the editing panel. Existing goals/limits stored in Roam blocks are automatically migrated to the new settings-based storage on first open
+- **Add aliases** — alternative names or page references (e.g. `[[My Project]]`) that will also match the category when calculating totals. This is especially useful when the category name in your graph differs from the label you want to display
+- **Pick a chart color** for each category — used consistently across the Time Dashboard bars and trends chart. Choose from the palette, or click ✦ to open a full color picker
+
+## Categories, goals and limits configuration
 
 If categories, and Goals & Limits blocks are not already defined, run `Time Tracker: Set categories list, goals & limits` to configure your categories. It will open `[[roam/depot/time tracker]]` in the sidebar and insert a template to help you to enter your own categories. You can paste manually the block reference of your categories list, or goals & limits list. Once its defined, all change in the corresping blocks and children blocks will automatically be taken into account. No more refresh or SmartBlock button is needed (corresponding SmartBlocks command are deprecated).
 
 ### Categories and sub-categories
 
-- You can define a list of categories, used as trigger words for elapsed time calculation of an interval and for more details in the total calculation. A category can consist in any string of characters (case unsensitive), or any page reference or block reference. To mention a category, just write it in plain text or mention it as block reference (so you can easily find the right category with block search) in a block where you want to measure the elapsed time on the correspoding task. 🆕 New in v.4: page references will be recognized regardless of how they are written: `[[page]]`, `#page` or `#[[page]]`.
+- You can define a list of categories, used as trigger words for elapsed time calculation of an interval and for more details in the total calculation. A category can consist in any string of characters (case unsensitive), or any page reference or block reference. To mention a category, just write it in plain text or mention it as block reference (so you can easily find the right category with block search) in a block where you want to measure the elapsed time on the correspoding task. Page references will be recognized regardless of how they are written: `[[page]]`, `#page` or `#[[page]]`.
 - Each category can be subdivided in sub-categories (e.g. 'reading', subdivided in 'article' and 'book'), and so forth. If a sub-category is mentionned in a block, the time will also be added to the parent category in total calculation. Two subcategories of two different categories can have the same name, in this case you will have to specify both the category and the subcategory in order to refer to it properly
 - You can mention multiple categories in the same block, time will be added in all of them but only once in their common ancestor, if they have one.
 
 ### Goals and limits
 
 - For each category or sub-category, you can define a goal (minimum to reach) or a limit (maximum not to exceed). Depending on whether the limit is respected or not, a flag (by default, a set of icon but you can switch to color tags or customize your own flags) will be inserted in the block, after elapsed time or total time spent. By default, a popup window will ask for confirmation before inserting the flag for the current task. It will be automatically applied in the total time blocks. Goals or limits can be defined both for an interval (elapsed time between two timestamps for a given task) or for a period: day, week or month.
-- To configure goal or limit, copy/paste the block reference of a given category as a child of a numeric indication of the correspond time, child of `/interval` or `/day` block. Duration can be written in minutes (e.g.: 30') or in hours (e.g.: 2h30)
+- To configure goal or limit via Roam blocks: copy/paste the block reference of a given category as a child of a numeric indication of the correspond time, child of `/interval` or `/day` block. Duration can be written in minutes (e.g.: 30') or in hours (e.g.: 2h30). Or use the **Categories manager** dialog described above.
 - You can set a goal or a limit inline, only for the current block, with `min:` and `max:` keyword, followed by a number of minutes. Native pomodoro timer is also taken into account as a limit (maximum) time.
 
 ## SmartBlocks commands

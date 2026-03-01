@@ -176,7 +176,7 @@ export function getTotalTimeOutput(total, period = "day", simple) {
     totalOutput.time = total;
     return totalOutput;
   }
-  let parentCategories = categoriesArray.filter((cat) => !cat.parent);
+  let parentCategories = categoriesArray.filter((cat) => !cat.parent && !cat.isTag);
   parentCategories.forEach((parent) => {
     setCategoryOutput(parent, totalOutput, period);
   });
@@ -188,6 +188,14 @@ export function getTotalTimeOutput(total, period = "day", simple) {
         uncategorized
       )
     );
+  // Tag categories (transversal) — displayed after regular categories, informational only
+  let tags = categoriesArray.filter((cat) => cat.isTag && cat.time !== 0);
+  tags.forEach((tag) => {
+    let title = tag.name;
+    if (tag.type === "pageRef") title += " ";
+    let formatedTagTotal = formatDisplayTime(tag, title, period, "", false);
+    totalOutput.addChild(new Output(formatedTagTotal, title, tag.time));
+  });
   if (total === 0) {
     total =
       parentCategories.reduce((sum, cat) => sum + cat.time, 0) + uncategorized;
@@ -339,9 +347,12 @@ function getListOfTotalByCategory(categories, shift = "") {
 export function copyTotalToClipboard() {
   if (autoCopyTotalToClipboard) {
     const uncategorized = getUncategorized();
-    const filteredCatArray = categoriesArray.filter((cat) => !cat.parent);
+    const filteredCatArray = categoriesArray.filter((cat) => !cat.parent && !cat.isTag);
     if (uncategorized)
       filteredCatArray.push({ name: "Uncategorized", time: uncategorized });
+    const tagCats = categoriesArray.filter((cat) => cat.isTag && cat.time !== 0);
+    if (tagCats.length)
+      filteredCatArray.push(...tagCats.map((t) => ({ name: t.name, time: t.time })));
     getListOfTotalByCategory(filteredCatArray);
     navigator.clipboard.writeText(getOutputForClipboard());
     simpleIziMessage(

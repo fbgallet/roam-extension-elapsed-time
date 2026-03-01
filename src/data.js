@@ -19,7 +19,7 @@ export async function createSettingsPage(extensionAPI) {
     // récupérer les uids pertinents
     simpleIziMessage(
       "[[roam/depot/time tracker]] has aleready some content. If not defined, set block references to categories list and goals&limits list manually, in extension settings. Or delete the page to generate the config template again.",
-      "red"
+      "red",
     );
     window.roamAlphaAPI.ui.rightSidebar.addWindow({
       window: { type: "block", "block-uid": pageUid },
@@ -31,19 +31,19 @@ export async function createSettingsPage(extensionAPI) {
     "How to set categories, goals and limits ?",
     true,
     true,
-    0
+    0,
   );
   createBlock(
     helpUid,
-    "Simply write your categories below, in place of the examples, as plain text, or block ref, or page ref. You can add as many categories and levels of subcategories as you need."
+    "Simply write your categories below, in place of the examples, as plain text, or block ref, or page ref. You can add as many categories and levels of subcategories as you need.",
   );
   createBlock(
     helpUid,
-    "Copy/paste block ref or Ctrl+drag&drop a given category to a child block of any given goal or limit time. You can remove or add any duration as you need, in min' or h format."
+    "Copy/paste block ref or Ctrl+drag&drop a given category to a child block of any given goal or limit time. You can remove or add any duration as you need, in min' or h format.",
   );
   createBlock(
     helpUid,
-    "Changes are instantly taken into account, you do not need to refresh your graph."
+    "Changes are instantly taken into account, you do not need to refresh your graph.",
   );
   //let settingsUid = await createBlock(pageUid, "User settings", true, 1, true);
 
@@ -56,9 +56,9 @@ export async function createSettingsPage(extensionAPI) {
 export async function createCategoriesBlock(parentUid, extensionAPI) {
   let titleUid = await createBlock(
     parentUid,
-    "**Categories** for Time tracker",
+    "**Categories** for Time tracker {{Time Tracker/Manage categories}}",
     true,
-    true
+    true,
   );
   let exA = await createBlock(titleUid, "Reading", true, true, 0);
   createBlock(exA, "Book");
@@ -73,19 +73,19 @@ export async function createLimitsBlock(parentUid, extensionAPI) {
     parentUid,
     "**Goals & Limits** for Time tracker",
     true,
-    true
+    true,
   );
   let goalUid = await createBlock(
     titleUid,
     "🎯 Goals (minimum to reach)",
     true,
-    false
+    false,
   );
   let limitUid = await createBlock(
     titleUid,
     "🛑 Limits (maximum not to exceed)",
     true,
-    false
+    false,
   );
   addIntervalByPeriod(goalUid);
   addIntervalByPeriod(limitUid);
@@ -97,7 +97,7 @@ export async function createLimitsBlock(parentUid, extensionAPI) {
     let periodsUid = await addChildrenBlocks(
       uid,
       ["/interval", "/day", "/week", "/month"],
-      true
+      true,
     );
     //console.log(periodsUid);
     if (periodsUid)

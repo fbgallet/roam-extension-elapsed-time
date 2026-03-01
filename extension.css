@@ -45,14 +45,15 @@ span.rm-page-ref[data-tag=".good-time"] {
   font-weight: 600;
 }
 
-/* Category row */
+/* Category row — left-border accent replaces old bullet icons */
 .et-category-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 4px;
-  border-radius: 4px;
+  padding: 6px 6px;
+  border-radius: 0 4px 4px 0;
   cursor: default;
+  margin-bottom: 1px;
 }
 
 .et-category-row:hover {
@@ -72,13 +73,6 @@ span.rm-page-ref[data-tag=".good-time"] {
   color: #666;
 }
 
-.et-type-icon {
-  font-size: 10px;
-  color: #888;
-  width: 14px;
-  text-align: center;
-}
-
 .et-category-name {
   flex: 1;
   cursor: pointer;
@@ -86,6 +80,71 @@ span.rm-page-ref[data-tag=".good-time"] {
 
 .et-category-name:hover {
   text-decoration: underline;
+}
+
+/* Inline editable name (replaces text when editing) */
+.et-category-name-editing {
+  flex: 1;
+  border: 1px solid rgba(16, 107, 163, 0.3);
+  border-radius: 3px;
+  background: transparent;
+  outline: none;
+  padding: 1px 4px;
+  min-width: 80px;
+}
+
+.et-category-name-editing.et-top-level-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #182026;
+}
+
+.et-category-name-editing.et-sub-level-name {
+  font-size: 13px;
+  font-weight: normal;
+  color: #394b59;
+}
+
+.et-category-name-editing:focus {
+  border-color: #106ba3;
+  box-shadow: 0 0 0 1px rgba(16, 107, 163, 0.3);
+}
+
+/* Aliases inline display (grey, in category row) */
+.et-aliases-inline {
+  font-size: 11px;
+  font-style: italic;
+  color: #999;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  flex-shrink: 1;
+}
+
+/* Alias editor list in edit panel */
+.et-alias-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.et-alias-tag {
+  font-size: 11px !important;
+  padding: 2px 6px !important;
+  background: rgba(16, 107, 163, 0.08) !important;
+}
+
+.et-alias-add-wrapper {
+  display: inline-flex;
+}
+
+.et-alias-add-input {
+  width: 140px !important;
+  height: 22px !important;
+  font-size: 11px !important;
+  padding: 1px 6px !important;
 }
 
 /* Top-level vs sub-level visual hierarchy */
@@ -96,8 +155,7 @@ span.rm-page-ref[data-tag=".good-time"] {
 }
 
 .et-top-level {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  margin-bottom: 1px;
+  margin-top: 2px;
 }
 
 .et-sub-level .et-category-name {
@@ -113,6 +171,188 @@ span.rm-page-ref[data-tag=".good-time"] {
 
 .et-category-row:hover .et-edit-btn {
   opacity: 1;
+}
+
+/* Edit panel (expanded under a category row) */
+.et-edit-panel {
+  border-left: 3px solid rgba(16, 107, 163, 0.2);
+  margin-left: 8px;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  background: rgba(16, 107, 163, 0.03);
+  border-radius: 0 6px 6px 0;
+}
+
+.et-edit-section {
+  margin-bottom: 8px;
+}
+
+.et-edit-section:last-child {
+  margin-bottom: 0;
+}
+
+.et-edit-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5c7080;
+  margin-bottom: 4px;
+  display: block;
+}
+
+/* Title input */
+.et-title-input {
+  width: 100% !important;
+  max-width: 300px;
+  height: 28px !important;
+  font-size: 13px !important;
+  padding: 2px 8px !important;
+}
+
+/* Color picker */
+.et-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.et-color-picker-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5c7080;
+  margin-right: 2px;
+}
+
+.et-color-swatch-option {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  outline: none;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.et-color-swatch-option:hover {
+  transform: scale(1.15);
+}
+
+.et-color-swatch-option.et-selected {
+  border-color: #182026;
+  box-shadow: 0 0 0 1px white, 0 0 0 3px #106ba3;
+}
+
+.et-auto-color {
+  background: linear-gradient(135deg, #ddd 25%, #bbb 50%, #ddd 75%);
+  font-size: 10px;
+  font-weight: 700;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* Custom color picker button */
+.et-custom-color-btn {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.et-custom-color-icon {
+  font-size: 10px;
+  color: #555;
+  pointer-events: none;
+}
+
+.et-color-input-hidden {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  padding: 0;
+  border: none;
+}
+
+/* Inline add form */
+.et-inline-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.et-add-input {
+  flex: 1;
+  max-width: 240px;
+  height: 28px !important;
+  font-size: 13px !important;
+  padding: 2px 8px !important;
+}
+
+/* Add section (button container) */
+.et-add-section {
+  padding: 4px 8px;
+}
+
+.et-add-btn {
+  color: #5c7080 !important;
+  font-size: 12px !important;
+  border: 1px dashed rgba(0, 0, 0, 0.15) !important;
+  border-radius: 4px !important;
+  width: 100%;
+  text-align: center;
+}
+
+.et-add-btn:hover {
+  color: #106ba3 !important;
+  border-color: #106ba3 !important;
+  background: rgba(16, 107, 163, 0.04) !important;
+}
+
+/* Action buttons (add sub, delete) */
+.et-action-btn {
+  font-size: 12px !important;
+}
+
+/* Delete confirmation */
+.et-confirm-dialog {
+  background: #fff5f5;
+  border: 1px solid #e8c4c4;
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+.et-confirm-text {
+  font-size: 12px;
+  color: #5c2626;
+  margin: 0 0 6px 0;
+}
+
+.et-confirm-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* Tag row in tree view — no expand arrow needed */
+.et-tag-row {
+  border-radius: 0 4px 4px 0;
+}
+
+.et-tag-row .et-tag-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #7c7caa;
 }
 
 /* Limit badges */
@@ -337,6 +577,18 @@ span.rm-page-ref[data-tag=".good-time"] {
 
 .et-totals-header {
   padding: 4px 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.et-copy-btn {
+  color: #5c7080;
+  font-size: 11px;
+}
+
+.et-copy-btn-done {
+  color: #29a634 !important;
 }
 
 .et-totals-grand {
@@ -387,6 +639,14 @@ span.rm-page-ref[data-tag=".good-time"] {
   height: 100%;
   background: #2965cc;
   border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.et-totals-bar-inner {
+  height: 100%;
+  display: flex;
+  border-radius: 3px;
+  overflow: hidden;
   transition: width 0.3s ease;
 }
 
@@ -527,6 +787,58 @@ span.rm-page-ref[data-tag=".good-time"] {
   padding: 4px 6px;
   background: #fff8e1;
   border-radius: 3px;
+}
+
+/* ── Tags (transversal categories) ───────────────────────────────────────── */
+
+.et-tags-section {
+  margin-top: 10px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.15);
+  padding-top: 6px;
+}
+
+.et-tags-section-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7c7caa;
+  padding: 2px 8px 4px;
+}
+
+/* Tag name in totals — same sizing/weight as equivalent category level, distinct color */
+
+.et-totals-tag .et-tag-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #7c7caa;
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+/* Tag bar in totals view — same height/radius as .et-totals-bar, distinct color */
+.et-totals-bar-tag {
+  height: 100%;
+  background: #7c7caa;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Tag row in picker */
+.et-picker-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7c7caa;
+  padding: 6px 4px 2px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.12);
+  margin-top: 4px;
+}
+
+.et-picker-tag-row .et-picker-name {
+  font-size: 12px;
+  color: #7c7caa;
 }
 
 /* Chart container */

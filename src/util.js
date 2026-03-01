@@ -71,6 +71,17 @@ export function getBlockContent(uid) {
   // ];
 }
 
+/**
+ * Replaces any ((uid)) block-references in a string with the content of the
+ * referenced block. Unresolvable references are left as-is.
+ */
+export function resolveReferences(str) {
+  if (!str) return str;
+  return str.replace(/\(\(([^\)]{9})\)\)/g, (match, uid) => {
+    return getBlockContent(uid) ?? match;
+  });
+}
+
 export function getBlocksUidReferencedInThisBlock(uid) {
   let q = `[:find ?u 
             :where 
@@ -535,4 +546,56 @@ export function sumOfArrayElements(array) {
 
 export function getCommonElements(arr1, arr2) {
   return arr1.filter((elt) => arr2.includes(elt));
+}
+
+const DASHBOARD_VALID_PERIODS = new Set(["day", "week", "month", "quarter"]);
+
+/**
+ * Given a click event on a Roam xparser button, parse the dashboard context
+ * from the block content and the current page.
+ *
+ * Returns { period, referenceDate } where:
+ * - period: one of "day"|"week"|"month"|"quarter" (from button syntax or default "day")
+ * - referenceDate: the Date of the daily note if the current page is a daily note
+ *   other than today, otherwise undefined (meaning: use today)
+ *
+ * Button syntax: {{Time Tracker/Total dashboard}} or {{Time Tracker/Total dashboard:week}}
+ */
+export function parseDashboardPeriodFromClick(e) {
+  const blockEl = e.target.closest("[data-block-uid]");
+  const blockUid = blockEl?.dataset?.blockUid;
+
+  // Parse period from button content
+  let period;
+  if (blockUid) {
+    const content = getBlockContent(blockUid) || "";
+    const match = content.match(
+      /\{\{(?:Time Tracker\/)?Total dashboard(?::(\w+))?\}\}/i
+    );
+    const parsed = match?.[1]?.toLowerCase();
+    if (DASHBOARD_VALID_PERIODS.has(parsed)) period = parsed;
+  }
+
+  // Resolve the page the button lives on
+  let referenceDate;
+  if (blockUid) {
+    const pageUid = getPageUidByAnyBlockUid(blockUid);
+    if (pageUid) {
+      const pageTitle = getPageNameByPageUid(pageUid);
+      const pageDate = pageTitle
+        ? window.roamAlphaAPI.util.pageTitleToDate(pageTitle)
+        : null;
+      if (pageDate) {
+        // Only use as reference if it's not today
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        pageDate.setHours(0, 0, 0, 0);
+        if (pageDate.getTime() !== today.getTime()) {
+          referenceDate = pageDate;
+        }
+      }
+    }
+  }
+
+  return { period, referenceDate };
 }
