@@ -1,10 +1,5 @@
 //import { displayTotalTimesTable } from "./components";
-import {
-  createCategoriesBlock,
-  createLimitsBlock,
-  createSettingsPage,
-} from "./data";
-import { elapsedTime } from "./elapsedTime";
+import { elapsedTime, elapsedTimeWithPicker } from "./elapsedTime";
 import { simpleIziMessage } from "./notify";
 import {
   getTotalTimeForCurrentNode,
@@ -33,6 +28,7 @@ import {
 import { openCategoriesManager } from "./components/CategoriesManager";
 import { openTimeDashboard } from "./components/TimeDashboard";
 import { openPageTimeDashboard } from "./components/PageTimeDashboard";
+import { openCategoryPicker } from "./components/CategoryPicker";
 
 /************************* PANEL SETTINGS VAR **************************/
 let _extensionAPI;
@@ -134,11 +130,17 @@ function setDurationRegex() {
 }
 
 function registerPaletteCommands(extensionAPI) {
+  const openManager = () =>
+    openCategoriesManager(extensionAPI, categoriesUID, limitsUID, (uid) => {
+      categoriesUID = uid;
+      addPullWatch(uid, getCategories);
+      updateOpenCategoriesCommand(extensionAPI);
+    });
   extensionAPI.ui.commandPalette.addCommand({
     label: "Time Tracker: Elapsed time in current block",
     callback: () => {
       const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
-      elapsedTime(startUid);
+      elapsedTimeWithPicker(startUid, extensionAPI, false, openManager);
     },
   });
   extensionAPI.ui.commandPalette.addCommand({
@@ -223,10 +225,21 @@ function registerPaletteCommands(extensionAPI) {
   // });
 
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Time Tracker: Manage categories, goals & limits",
+    label: "Time Tracker: Choose category",
     callback: () => {
-      openCategoriesManager(extensionAPI, categoriesUID, limitsUID);
+      const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
+      if (startUid) openCategoryPicker(startUid, extensionAPI, openManager);
+      else
+        simpleIziMessage(
+          "A category can only be inserted if a block is focused.",
+          "red",
+        );
     },
+  });
+
+  extensionAPI.ui.commandPalette.addCommand({
+    label: "Time Tracker: Manage categories, goals & limits",
+    callback: () => openManager(),
   });
 
   extensionAPI.ui.commandPalette.addCommand({
@@ -251,52 +264,24 @@ function registerPaletteCommands(extensionAPI) {
     },
   });
 
-  if (getBlockAttributes(categoriesUID)) {
-    addOpenCategoriesAndLimitsCommands(extensionAPI);
-  } else {
-    addOpenSettingsCommand(extensionAPI);
-  }
+  if (categoriesUID) updateOpenCategoriesCommand(extensionAPI);
 }
 
-function registerSlashCommands() {
+function registerSlashCommands(extensionAPI) {
   window.roamAlphaAPI.ui.slashCommand.addCommand({
     label: "Time tracker",
     callback: (args) => {
       const startUid = args["block-uid"];
-      elapsedTime(startUid);
+      const openManager = () =>
+        openCategoriesManager(extensionAPI, categoriesUID, limitsUID, (uid) => {
+          categoriesUID = uid;
+          addPullWatch(uid, getCategories);
+          updateOpenCategoriesCommand(extensionAPI);
+        });
+      elapsedTimeWithPicker(startUid, extensionAPI, true, openManager);
       return "";
     },
   });
-}
-
-function addOpenSettingsCommand(extensionAPI) {
-  extensionAPI.ui.commandPalette.addCommand({
-    label: "Time Tracker: Set categories list, goals & limits",
-    callback: async () => {
-      if (normalizeUID(categoriesUID) || normalizeUID(limitsUID)) {
-        simpleIziMessage(
-          "Categories block reference and/or Goals&Limits block reference are already defined, open extension settings to change them.",
-          "red",
-        );
-        return;
-      }
-      let pageUid = await createSettingsPage(extensionAPI);
-      if (!pageUid) return;
-      categoriesUID = await createCategoriesBlock(pageUid, extensionAPI);
-      limitsUID = await createLimitsBlock(pageUid, extensionAPI);
-      addOpenCategoriesAndLimitsCommands(extensionAPI);
-    },
-  });
-}
-
-function addOpenCategoriesAndLimitsCommands(
-  extensionAPI,
-  catUid = categoriesUID,
-  limitUid = limitsUID,
-) {
-  updateOpenCategoriesCommand(extensionAPI, catUid);
-  updateOpenLimitsCommand(extensionAPI, limitUid);
-  removeOpenSettingsCommand(extensionAPI);
 }
 
 function updateOpenCategoriesCommand(extensionAPI, catUid = categoriesUID) {
@@ -307,22 +292,6 @@ function updateOpenCategoriesCommand(extensionAPI, catUid = categoriesUID) {
         window: { type: "block", "block-uid": catUid },
       });
     },
-  });
-}
-function updateOpenLimitsCommand(extensionAPI, limitsUid = limitsUID) {
-  extensionAPI.ui.commandPalette.addCommand({
-    label: "Time Tracker: Open goals & limits in sidebar",
-    callback: async () => {
-      window.roamAlphaAPI.ui.rightSidebar.addWindow({
-        window: { type: "block", "block-uid": limitsUid },
-      });
-    },
-  });
-}
-
-function removeOpenSettingsCommand(extensionAPI) {
-  extensionAPI.ui.commandPalette.removeCommand({
-    label: "Time Tracker: Set categories list, goals & limits",
   });
 }
 
@@ -433,9 +402,27 @@ export default {
           action: {
             type: "button",
             onClick: () => {
-              openCategoriesManager(extensionAPI, categoriesUID, limitsUID);
+              openCategoriesManager(extensionAPI, categoriesUID, limitsUID, (uid) => {
+                categoriesUID = uid;
+                addPullWatch(uid, getCategories);
+                updateOpenCategoriesCommand(extensionAPI);
+              });
             },
             content: "Manage categories...",
+          },
+        },
+        {
+          id: "categoriesSetting",
+          name: "Categories",
+          description:
+            "Parent block reference where your categories and subcategories are listed (default in [[roam/depot/time tracker]])",
+          action: {
+            type: "input",
+            onChange: (evt) => {
+              categoriesUID = correctUidInput(evt.target.value);
+              if (categoriesUID) updateOpenCategoriesCommand(extensionAPI);
+              getCategories(categoriesUID);
+            },
           },
         },
         {
@@ -508,38 +495,6 @@ export default {
             type: "switch",
             onChange: (evt) => {
               autoCopyTotalToClipboard = !autoCopyTotalToClipboard;
-            },
-          },
-        },
-        {
-          id: "categoriesSetting",
-          name: "Categories",
-          description:
-            'Parent block reference where your categories and subcategories are listed. Use command "Time Tracker: Manage categories, goals & limits" to open the manager dialog:',
-          action: {
-            type: "input",
-            onChange: (evt) => {
-              categoriesUID = correctUidInput(evt.target.value);
-              if (!categoriesUID) addOpenSettingsCommand(extensionAPI);
-              else addOpenCategoriesAndLimitsCommands(extensionAPI);
-              getCategories(categoriesUID);
-            },
-          },
-        },
-        {
-          id: "limitsSetting",
-          name: "Goals and Limits",
-          description:
-            "Parent block reference where your goals and limits are set:",
-          action: {
-            type: "input",
-            onChange: (evt) => {
-              limitsUID = correctUidInput(evt.target.value);
-              if (limitsUID != null)
-                addOpenCategoriesAndLimitsCommands(extensionAPI);
-              if (!limitsUID && !categoriesUID)
-                addOpenSettingsCommand(extensionAPI);
-              getLimits(limitsUID);
             },
           },
         },
@@ -700,10 +655,17 @@ export default {
         ? addPullWatch(categoriesUID, getCategories)
         : await extensionAPI.settings.set("categoriesSetting", undefined);
     limitsUID = normalizeUID(extensionAPI.settings.get("limitsSetting"));
-    if (limitsUID)
-      getBlockAttributes(limitsUID)
-        ? addPullWatch(limitsUID, getLimits)
-        : await extensionAPI.settings.set("limitsSetting", undefined);
+    if (limitsUID) {
+      const hasSettingsLimits =
+        Object.keys(extensionAPI.settings.get("categoryLimits") || {}).length >
+        0;
+      if (getBlockAttributes(limitsUID)) {
+        // Only watch the old block-based limits if not yet migrated to settings
+        if (!hasSettingsLimits) addPullWatch(limitsUID, getLimits);
+      } else {
+        await extensionAPI.settings.set("limitsSetting", undefined);
+      }
+    }
     if (extensionAPI.settings.get("displayTotalSetting") === null)
       await extensionAPI.settings.set("displayTotalSetting", "blocks");
     extensionAPI.settings.get("displayTotalSetting") === "blocks"
@@ -755,7 +717,7 @@ export default {
     autoCopyTotalToClipboard = extensionAPI.settings.get("autoCopyToClipboard");
 
     registerPaletteCommands(extensionAPI);
-    registerSlashCommands();
+    registerSlashCommands(extensionAPI);
     registerSmartblocksCommands(extensionAPI);
     getParameters();
 
@@ -767,7 +729,11 @@ export default {
         btn.classList.contains("rm-xparser-default-Manage") &&
         btn.classList.contains("categories")
       ) {
-        openCategoriesManager(extensionAPI, categoriesUID, limitsUID);
+        openCategoriesManager(extensionAPI, categoriesUID, limitsUID, (uid) => {
+          categoriesUID = uid;
+          addPullWatch(uid, getCategories);
+          updateOpenCategoriesCommand(extensionAPI);
+        });
         return;
       }
 

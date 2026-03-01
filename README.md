@@ -30,6 +30,20 @@ Calculate and insert elapsed time between two timestamp. The `Elapsed time` comm
 
 Another way to insert easily timestamps and run this command is to use SmartBlocks command. For instructions, see 'SmartBlocks commands' section below.
 
+### Category autocomplete picker
+
+After inserting a timestamp (or just after elapsed time is calculated), a **category picker popover** automatically appears below the active block. It lists all your configured categories and tags so you can insert one without typing it manually:
+
+- **Type** to filter the list in real time — characters are matched against category names and aliases. The popover closes automatically if no match is found.
+- **↑ / ↓** to navigate, **Enter** or **Tab** to confirm the highlighted category, **Escape** to dismiss.
+- **Click** any item to insert it immediately.
+- Subcategories are shown indented under their parent. Task **goal** and **limit** badges are displayed next to each entry for quick reference.
+- The selected category is inserted intelligently: after a single timestamp, after elapsed time, or replacing the filter characters you already typed.
+- If the block already had elapsed time calculated, the limits/goals are **recomputed** automatically after insertion.
+- An **⚙ Open Categories manager** shortcut at the top of the list lets you jump directly to the manager dialog.
+
+You can also open the picker at any time with the command palette command `Time Tracker: Choose category` (a block must be focused).
+
 If categories and limits/goals have been set, and if you have mentionned a category in the current block, a popup will appear at the bottom indicating if the limit/goal has been reached or exceeded. By pressing the 'Too much' or 'Not enough' button (selected by default), the corresponding flag will be inserted into the block, right after the elapsed time.
 
 The flags are customizable (🎯,⚠️,👍,🛑 by default), you can change the icon and add a `<diff>` placeholder to insert the time difference with the limit or goal. For example, if the limit for Mail was 15' and the elapsed time is 25', `🛑+10` will be inserted.
@@ -106,7 +120,7 @@ Open it from:
 
 ## Categories, goals and limits configuration
 
-If categories, and Goals & Limits blocks are not already defined, run `Time Tracker: Set categories list, goals & limits` to configure your categories. It will open `[[roam/depot/time tracker]]` in the sidebar and insert a template to help you to enter your own categories. You can paste manually the block reference of your categories list, or goals & limits list. Once its defined, all change in the corresping blocks and children blocks will automatically be taken into account. No more refresh or SmartBlock button is needed (corresponding SmartBlocks command are deprecated).
+To get started, simply open the **Categories manager** (via the `Time Tracker: Manage categories, goals & limits` command, or the **"Manage categories..."** button in extension settings). If no categories block exists yet, the manager automatically creates one on `[[roam/depot/time tracker]]` and opens that page in the sidebar. You can also set a custom block reference for your categories list manually in the extension settings (`Categories` field). Once defined, any change to the corresponding blocks and their children is automatically reflected — no refresh needed.
 
 ### Categories and sub-categories
 
@@ -117,7 +131,7 @@ If categories, and Goals & Limits blocks are not already defined, run `Time Trac
 ### Goals and limits
 
 - For each category or sub-category, you can define a goal (minimum to reach) or a limit (maximum not to exceed). Depending on whether the limit is respected or not, a flag (by default, a set of icon but you can switch to color tags or customize your own flags) will be inserted in the block, after elapsed time or total time spent. By default, a popup window will ask for confirmation before inserting the flag for the current task. It will be automatically applied in the total time blocks. Goals or limits can be defined both for an interval (elapsed time between two timestamps for a given task) or for a period: day, week or month.
-- To configure goal or limit via Roam blocks: copy/paste the block reference of a given category as a child of a numeric indication of the correspond time, child of `/interval` or `/day` block. Duration can be written in minutes (e.g.: 30') or in hours (e.g.: 2h30). Or use the **Categories manager** dialog described above.
+- To configure goals or limits, use the **Categories manager** dialog described above. Alternatively, if you have existing block-based goals/limits, they will be offered for migration to the new settings-based storage when you first open the manager.
 - You can set a goal or a limit inline, only for the current block, with `min:` and `max:` keyword, followed by a number of minutes. Native pomodoro timer is also taken into account as a limit (maximum) time.
 
 ## SmartBlocks commands

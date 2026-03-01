@@ -18,8 +18,9 @@ import {
   limitFlag,
   remoteElapsedTime,
 } from ".";
-import { scanCategories } from "./categories";
+import { scanCategories, categoriesArray } from "./categories";
 import { getDifferenceWithLimit } from "./display";
+import { openCategoryPicker } from "./components/CategoryPicker";
 
 /*======================================================================================================*/
 /* ELAPSED TIME SB */
@@ -347,5 +348,42 @@ function extractLimit(s, shift) {
     i++;
   }
   return parseInt(t) || 0;
+}
+
+export function elapsedTimeWithPicker(blockUID, extensionAPI, fromSlash = false, onOpenManager = null) {
+  if (!categoriesArray.length) {
+    elapsedTime(blockUID);
+    return;
+  }
+
+  // For slash commands: Roam clears the slash text after the callback returns,
+  // so we must delay our entire processing until after that happens.
+  const delay = fromSlash ? 100 : 0;
+
+  setTimeout(() => {
+    const blockContent = getBlockContent(blockUID);
+    const timestampsBefore =
+      blockContent ? [...blockContent.matchAll(timestampRegex)].length : 0;
+
+    // Insert timestamp (or calculate elapsed) immediately
+    elapsedTime(blockUID);
+
+    // Show picker after updateBlock's internal 50ms delay has settled
+    setTimeout(() => {
+      const contentAfter = getBlockContent(blockUID) || "";
+      const timestampsAfter = [...contentAfter.matchAll(timestampRegex)].length;
+
+      // Show picker only if:
+      // - a new timestamp was just inserted (0→1), OR
+      // - elapsed time was just calculated (had 2 timestamps, still has them)
+      // - but NOT when remoteElapsedTime fired on sibling and current block stayed empty
+      const justStarted = timestampsBefore === 0 && timestampsAfter === 1;
+      const justCalculated = timestampsBefore >= 2;
+
+      if (justStarted || justCalculated) {
+        openCategoryPicker(blockUID, extensionAPI, onOpenManager, elapsedTime);
+      }
+    }, 200);
+  }, delay);
 }
 

@@ -17,6 +17,7 @@ import {
   updateBlock,
   normalizeUID,
 } from "../util";
+import { createSettingsPage, createCategoriesBlock } from "../data";
 
 const INTERVALS = ["task", "day", "week", "month"];
 const emptyIntervals = () => ({ task: 0, day: 0, week: 0, month: 0 });
@@ -1002,15 +1003,31 @@ const CategoriesManager = ({ onClose, extensionAPI, categoriesUID, limitsUID }) 
 };
 
 /*──────────────────────────────────────────────────────────────────────────────
-  Launcher function – opens the dialog via renderOverlay
+  Launcher function – opens the dialog via renderOverlay.
+  If no categoriesUID is set yet (fresh install), auto-creates the parent block
+  on [[roam/depot/time tracker]] before opening. Calls onCategoriesCreated(uid)
+  so index.js can update its module-level variable and register the pull watch.
 ──────────────────────────────────────────────────────────────────────────────*/
-export function openCategoriesManager(extensionAPI, categoriesUID, limitsUID) {
+export async function openCategoriesManager(
+  extensionAPI,
+  categoriesUID,
+  limitsUID,
+  onCategoriesCreated,
+) {
+  let uid = categoriesUID;
+  if (!uid) {
+    const pageUid = await createSettingsPage(extensionAPI);
+    if (pageUid) {
+      uid = await createCategoriesBlock(pageUid, extensionAPI);
+      onCategoriesCreated?.(uid);
+    }
+  }
   renderOverlay({
     Overlay: (props) => (
       <CategoriesManager
         {...props}
         extensionAPI={extensionAPI}
-        categoriesUID={categoriesUID}
+        categoriesUID={uid}
         limitsUID={limitsUID}
       />
     ),

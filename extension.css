@@ -16,10 +16,10 @@ span.rm-page-ref[data-tag=".good-time"] {
 /* ── Categories Manager Dialog ─────────────────────────────────────────── */
 
 .et-categories-manager {
-  width: 620px;
-  max-height: 82vh;
+  width: 650px;
+  max-height: 90vh;
   position: fixed;
-  top: 50%;
+  top: 48%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 30;
@@ -27,7 +27,7 @@ span.rm-page-ref[data-tag=".good-time"] {
 
 .et-categories-manager .bp3-dialog-body {
   overflow-y: auto;
-  max-height: 62vh;
+  max-height: 75vh;
   padding: 12px 20px;
 }
 
@@ -235,7 +235,9 @@ span.rm-page-ref[data-tag=".good-time"] {
   cursor: pointer;
   padding: 0;
   outline: none;
-  transition: border-color 0.15s, transform 0.15s;
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
 }
 
 .et-color-swatch-option:hover {
@@ -244,7 +246,9 @@ span.rm-page-ref[data-tag=".good-time"] {
 
 .et-color-swatch-option.et-selected {
   border-color: #182026;
-  box-shadow: 0 0 0 1px white, 0 0 0 3px #106ba3;
+  box-shadow:
+    0 0 0 1px white,
+    0 0 0 3px #106ba3;
 }
 
 .et-auto-color {
@@ -852,4 +856,120 @@ span.rm-page-ref[data-tag=".good-time"] {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/*──────────────────────────────────────────────────────────────────────────────
+  Category Picker – autocomplete popover
+──────────────────────────────────────────────────────────────────────────────*/
+.et-cp-container {
+  position: fixed;
+  z-index: 100;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  max-height: 280px;
+  width: clamp(260px, 50vw, 480px);
+  max-width: calc(100vw - 16px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.et-cp-list {
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.et-cp-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #182026;
+}
+
+.et-cp-item:hover,
+.et-cp-highlighted {
+  background: rgba(16, 107, 163, 0.08);
+}
+
+.et-cp-child {
+  padding-left: 28px;
+}
+
+.et-cp-child .et-cp-name {
+  font-weight: normal;
+  color: #394b59;
+}
+
+.et-cp-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.et-cp-name {
+  flex: 1;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.et-cp-parent-hint {
+  font-weight: normal;
+  font-size: 11px;
+  color: #999;
+  margin-left: 6px;
+  font-style: italic;
+}
+
+.et-cp-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+.et-cp-goal {
+  color: #0d8050;
+  background: rgba(13, 128, 80, 0.1);
+}
+
+.et-cp-limit {
+  color: #c23030;
+  background: rgba(194, 48, 48, 0.1);
+}
+
+.et-cp-divider {
+  height: 0;
+  margin: 4px 12px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.15);
+}
+
+.et-cp-filter-hint {
+  padding: 4px 12px 2px;
+  font-size: 11px;
+  color: #888;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-style: italic;
+}
+
+.et-cp-manager {
+  color: #5c7080;
+  font-size: 12px;
+}
+
+.et-cp-manager-icon {
+  font-size: 13px;
+  opacity: 0.6;
+  flex-shrink: 0;
 }

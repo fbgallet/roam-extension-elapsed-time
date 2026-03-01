@@ -1,3 +1,15 @@
+## v.5 (February 2026) Major update - Dashboards & Category manager
+
+### New feature:
+
+- Dashboard for visualization of Totals & Trends (charts)
+- Category manager dialog box
+- Category autocomplete picker
+
+### Updates:
+
+- '#tags' are a new type of transversal category
+
 ## v.4 (May 3rd, 2024) important fixes
 
 ### New feature:
