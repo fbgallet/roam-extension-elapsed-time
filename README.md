@@ -6,9 +6,7 @@ Review total by day, week, month, quarter, year, or any given period of time. Vi
 
 see [changelog here](https://github.com/fbgallet/roam-extension-elapsed-time/blob/main/CHANGELOG.md)
 
-![Elapsed time demo](https://user-images.githubusercontent.com/74436347/184550335-ac5acde2-c9f9-459b-8e30-ec239abd7041.gif)
-
-### More comprehensive demo and small tutorial videos in [this Twitter/X thread](https://twitter.com/fbgallet/status/1668969876050829312).
+![Time Tracker short demo v 5 bis](https://github.com/user-attachments/assets/98821747-a3f4-473d-a0a4-4d7b2c31d969)
 
 ## Features and instructions
 
@@ -24,9 +22,12 @@ Calculate and insert elapsed time between two timestamp. The `Elapsed time` comm
 - if it contains already two timestamps, the elapsed time will be (re)calculated,
 - if there is no timestamp (or a Smartblock button for a timestamp), a timestamp (now) will be inserted,
 
-💡 If you set hotkeys for this command, **it will be very easy, with the same hotkeys**, to insert a first timestamp, then insert the second and get the elapsed time.
+If you set hotkeys for this command, **it will be very easy, with the same hotkeys**, to insert a first timestamp, then insert the second and get the elapsed time.
 
-💥 with `Remote elapsed time` enabled (by default), if there is no timestamp in current block, a timestamp to be completed with a second one is searched in the previous sibbling block. So that the elapsed time will be calculated in the remote block. The now timestamp will also be inserted in the current block. This way, you need to use the '/tra' slash command or to press the hotkeys only one time to both calculate previous elapsed time and set the begin timestamp for the next activity, which makes interstitial journaling as seamless as possible!
+> [!TIP]
+> 💥 with `Remote elapsed time` enabled (by default), if there is no timestamp in current block, a timestamp to be completed with a second one is searched in the previous sibbling block.
+> So that the elapsed time will be calculated in the remote block. The now timestamp will also be inserted in the current block.
+> This way, you need to use the '/tra' slash command or to press the hotkeys only one time to both calculate previous elapsed time and set the begin timestamp for the next activity, which makes interstitial journaling as seamless as possible!
 
 Another way to insert easily timestamps and run this command is to use SmartBlocks command. For instructions, see 'SmartBlocks commands' section below.
 
@@ -88,9 +89,16 @@ When you open the dashboard while focused on a **non-daily-note page**, it opens
 
 Shows a horizontal bar chart for each category over the selected period. Top-level categories display a **stacked bar** breaking down their subcategories. Goal and limit markers are shown on the bars so you can see at a glance whether you are on track. Click the expand arrow (▸) next to a category to drill down into its subcategories.
 
+<img width="945" height="567" alt="image" src="https://github.com/user-attachments/assets/eb117a6f-af45-4d9d-a3cb-1250367c6d5a" />
+
+
 ### Trends tab
 
 Shows time per category over time as a **stacked bar chart**. Select which categories to display using the checkbox tree on the left. Use the **Group by** switcher to aggregate data by day, week, month, or quarter. Goal and limit reference lines are drawn on the chart for each selected category.
+
+
+<img width="1101" height="681" alt="image" src="https://github.com/user-attachments/assets/e9956afe-1692-4f64-a7c8-395a6aac7633" />
+
 
 ### Period selector
 
@@ -122,6 +130,8 @@ Open it from:
 - A native Roam button: `{{Time Tracker/Manage categories}}`
 
 ### What you can do in the manager
+
+<img width="613" height="431" alt="image" src="https://github.com/user-attachments/assets/7c8a9e79-91f8-43e3-af6d-f854c408abd9" />
 
 - **Add** top-level categories or subcategories with the inline form
 - **Rename** any category by clicking its name or the ✎ pencil icon
