@@ -17,9 +17,9 @@ span.rm-page-ref[data-tag=".good-time"] {
 
 .et-categories-manager {
   width: 650px;
-  max-height: 90vh;
+  max-height: 92vh;
   position: fixed;
-  top: 48%;
+  top: 47%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 30;
@@ -27,8 +27,8 @@ span.rm-page-ref[data-tag=".good-time"] {
 
 .et-categories-manager .bp3-dialog-body {
   overflow-y: auto;
-  max-height: 75vh;
-  padding: 12px 20px;
+  max-height: 80vh;
+  padding: 0px 10px;
 }
 
 /* Tab bar */
@@ -473,7 +473,7 @@ span.rm-page-ref[data-tag=".good-time"] {
   max-width: 96vw;
   max-height: 94vh;
   position: fixed;
-  top: 48%;
+  top: 47%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 30;
@@ -487,7 +487,7 @@ span.rm-page-ref[data-tag=".good-time"] {
   overflow-y: auto;
   flex: 1;
   min-height: 0;
-  padding: 14px 22px;
+  padding: 2px 12px;
 }
 
 .et-dashboard-body {

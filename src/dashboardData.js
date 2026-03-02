@@ -157,21 +157,22 @@ export function getDateRange(preset, referenceDate = new Date()) {
       break;
     case "week": {
       const dayOfWeek = ref.getDay();
-      // Week starts on Monday (1)
+      // Week starts on Monday (1), ends on Sunday (7)
       const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
       startDate = new Date(ref);
       startDate.setDate(ref.getDate() + mondayOffset);
-      endDate = new Date(ref);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
       break;
     }
     case "month":
       startDate = new Date(ref.getFullYear(), ref.getMonth(), 1);
-      endDate = new Date(ref);
+      endDate = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
       break;
     case "quarter": {
       const quarterStartMonth = Math.floor(ref.getMonth() / 3) * 3;
       startDate = new Date(ref.getFullYear(), quarterStartMonth, 1);
-      endDate = new Date(ref);
+      endDate = new Date(ref.getFullYear(), quarterStartMonth + 3, 0);
       break;
     }
     default:

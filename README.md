@@ -52,14 +52,13 @@ The flags are customizable (🎯,⚠️,👍,🛑 by default), you can change th
 
 Total is calculated as the sum of elapsed times (⚠️ formated by Time tracker, double timestamps without calculated elapsed time are not taken into account!) and pomodoros (if no elapsed time in the block, and whether or not they have been completed). Embedded blocks can optionally be taken into account (not if the orginal blocks are on the same page as the embeds).
 
-It is displayed in a customizable format (ex: `category: **30'**` with time expressed in minutes with `<tm>` placeholder, or hours and minutes with `<th>` or decimal hours with `<td>`). All totals and subtotals will be displayed in a basic outline of blocks by default, but can also be displayed in Roam {{table}} and is copied in the clipboard in a simple text format.
+The easiest way to explore totals is by opening the new Dashboard (see below), but you can still insert totals inline. It is displayed in a customizable format (ex: `category: **30'**` with time expressed in minutes with `<tm>` placeholder, or hours and minutes with `<th>` or decimal hours with `<td>`). All totals and subtotals will be displayed in a basic outline of blocks by default, but can also be displayed in Roam {{table}} and is copied in the clipboard in a simple text format.
 
 Total can be calculated in different range of data or periods, depending on the command used:
 
-- `total for current day or page`: total and subtotals are calculated by category. An elapsed time is added to one or more categories if they are in the same block or if a category is in an ancestor block (see "Categories, goals and limits configuration" for more information).
+- `total for current day or page`: total and subtotals are calculated by category. An elapsed time is added to one or more categories if they are in the same block or if a category is in an ancestor block (see "Categories, goals and limits configuration" for more information). For other periods, use the next command or the Dashboard.
   💥 Just enter 'day' in the command palette to get the command.
-- `total for current week/month/quarter/year`: only days of the current week (or other period) are taken into account, relative to the Daily Note from which the command is run. If the command isn't run in a Daily Note, the reference is the current day. So, if you want to calculate the total of the last week, you can simply run the command in the corresponding sunday Daily Note.
-- `total according to natural language expression in current block`: simply write in natural language a period of time to be taken into account, relative to the Daily Note where you write, and run the command while the correspond block is focused. Day, week, month, quarter and year are supported as period. If no period is specified, the default unit is the day. '15' calculate the total of the last 15 days. If you want to total of the two last month, you can just write 'two months'. Other examples: "previous week", "2 quarters", etc. Natural language recognition is currently very basic and doesn't recognize given date or date range, significant improvements could be made if requested by users.
+- `total according to natural language expression in current block`: simply write in natural language a period of time to be taken into account, relative to the Daily Note where you write, and run the command while the correspond block is focused. Day, week, month, quarter and year are supported as period. If no period is specified, the default unit is the day. '15' calculate the total of the last 15 days. If you want to total of the two last month, you can just write 'two months'. Other examples: "previous week", "2 quarters", etc.
 - `simple total in context (sibbling/children blocks)`: only total is calcultated (without taking into account the categories), only in a subset of the page:
   - if the command is executed in a block with children, the calculation will be done on all children and their children,
   - otherwise, it will concern the sibbling blocks and their children.
@@ -72,9 +71,18 @@ For any of these commands,
 - if the cursor is in a block with children, total and total by categories will be inserted as the last children, and a block reference to the total will be inserted in the current block
 - if no block is selected, the total will be inserted as the last block of the page
 
-## 🆕 Time Dashboard
+## 🆕 Dashboard (Totals & Trends)
 
-The **Time Dashboard** is an interactive dialog that gives you a visual overview of your tracked time. Open it with the command `Time Tracker: Open Dashboard` or via the `{{Time Tracker/Total dashboard}}` button (see below).
+The **Time Tracker Dashboard** is an interactive dialog that gives you a visual overview of your tracked time. Open it with the command `Time Tracker: Open Dashboard (Totals & Trends)` or via the `{{Time Tracker/Total dashboard}}` button (see below).
+
+### Modes: Daily Notes vs Page
+
+The dashboard operates in two modes, switchable via the toggle buttons in the header:
+
+- **Daily Notes mode** (default) — surveys all your daily note pages over the selected period. This is the standard view for reviewing how you spent your time across days.
+- **Page mode** — scopes all data to a specific Roam page and its block references. Use the page picker that appears at the top to select any page. This is useful for project-centric views, e.g. to see all time tracked under `[[My Project]]` blocks regardless of which day they were logged.
+
+When you open the dashboard while focused on a **non-daily-note page**, it opens directly in Page mode with that page pre-selected.
 
 ### Totals tab
 
@@ -87,6 +95,10 @@ Shows time per category over time as a **stacked bar chart**. Select which categ
 ### Period selector
 
 Use the preset buttons (Today / This Week / This Month / This Quarter) or pick a **Custom** date range. Navigate backward and forward with the ‹ › arrows.
+
+Presets always cover the **full period** — This Week runs Monday through Sunday, This Month covers the entire calendar month, and This Quarter spans the full three-month block.
+
+When you open the dashboard from a **daily note page** (via the command palette or a `{{Time Tracker/Total dashboard}}` button placed on a DNP), the presets use that note's date as their reference instead of today. For example, opening from a note dated last Monday will show "This Week" as that week (Monday–Sunday), not the current week.
 
 ### Opening the dashboard from a Roam button
 
@@ -124,9 +136,18 @@ To get started, simply open the **Categories manager** (via the `Time Tracker: M
 
 ### Categories and sub-categories
 
-- You can define a list of categories, used as trigger words for elapsed time calculation of an interval and for more details in the total calculation. A category can consist in any string of characters (case unsensitive), or any page reference or block reference. To mention a category, just write it in plain text or mention it as block reference (so you can easily find the right category with block search) in a block where you want to measure the elapsed time on the correspoding task. Page references will be recognized regardless of how they are written: `[[page]]`, `#page` or `#[[page]]`.
+- You can define a list of categories, used as trigger words for elapsed time calculation of an interval and for more details in the total calculation. A category can consist in any string of characters (case unsensitive), or any page reference or block reference. To mention a category, just write it in plain text or mention it as block reference (so you can easily find the right category with block search) in a block where you want to measure the elapsed time on the correspoding task. Page references have to follow the strict Roam `[[page]]` syntax, since tags a processed differently (see below Tag categories)
 - Each category can be subdivided in sub-categories (e.g. 'reading', subdivided in 'article' and 'book'), and so forth. If a sub-category is mentionned in a block, the time will also be added to the parent category in total calculation. Two subcategories of two different categories can have the same name, in this case you will have to specify both the category and the subcategory in order to refer to it properly
 - You can mention multiple categories in the same block, time will be added in all of them but only once in their common ancestor, if they have one.
+
+### Tag categories (transversal labels)
+
+Any top-level category whose name starts with `#` (e.g. `#deep-work`, `#admin`) is treated as a **tag category**. Tags behave differently from regular categories:
+
+- They accumulate time **independently** — the time is tracked against the tag but is **not added to the global total** and does not count toward any regular category.
+- They are **transversal**: a block can match both a regular category and one or more tags simultaneously. The tag time is informational only.
+- Tag categories **cannot have sub-categories**.
+- They appear in the Dashboard alongside regular categories so you can visualize how much time was spent under each tag across any period.
 
 ### Goals and limits
 
@@ -155,6 +176,10 @@ You can copy and adapt the existing SmartBlocks to your needs (with a new name, 
 
 ---
 
-### For any question or suggestion, DM me on Twitter and follow me to be informed of updates and new extensions: [@fbgallet](https://twitter.com/fbgallet)
+## If you want to support my work
 
-To report some issue, follow this [link on GitHub](https://github.com/fbgallet/roam-extension-elapsed-time/issues) and click on 'New issue'.
+If you want to encourage me to develop further and enhance Time Tracker extension, you can [buy me a coffee ☕ here](https://buymeacoffee.com/fbgallet) or [sponsor me on Github](https://github.com/sponsors/fbgallet). Thanks in advance for your support! 🙏
+
+For any question or suggestion, DM me on **X/Twitter** and follow me to be informed of updates and new extensions : [@fbgallet](https://x.com/fbgallet), on Bluesky: [@fbgallet.bsky.social](https://bsky.app/profile/fbgallet.bsky.social) or on Mastodon: [@fbgallet](https://mastodon.social/home).
+
+Please report any issue [here](https://github.com/fbgallet/roam-extension-elapsed-time/issues).

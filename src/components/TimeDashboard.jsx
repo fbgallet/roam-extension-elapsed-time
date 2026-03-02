@@ -7,7 +7,6 @@ import React, {
 } from "react";
 import { renderOverlay } from "./renderOverlay";
 import { Chart, registerables } from "chart.js";
-import { categoriesArray, onCategoriesChange } from "../categories";
 import {
   getDashboardData,
   getDateRange,
@@ -98,12 +97,18 @@ const PRESETS = [
 /*──────────────────────────────────────────────────────────────────────────────
   PeriodSelector
 ──────────────────────────────────────────────────────────────────────────────*/
-export const PeriodSelector = ({ preset, startDate, endDate, onChange }) => {
+export const PeriodSelector = ({
+  preset,
+  startDate,
+  endDate,
+  referenceDate,
+  onChange,
+}) => {
   const [showCustom, setShowCustom] = useState(preset === "custom");
 
   const handlePreset = (key) => {
     setShowCustom(false);
-    const range = getDateRange(key);
+    const range = getDateRange(key, referenceDate);
     onChange({ preset: key, ...range });
   };
 
@@ -535,7 +540,9 @@ export const TotalsView = ({ data, preset, fixedColors, scopeCategory }) => {
                 >
                   ▸
                 </span>
-                <span className="et-totals-name et-tag-name">{catLabel(tag)}</span>
+                <span className="et-totals-name et-tag-name">
+                  {catLabel(tag)}
+                </span>
                 <span className="et-totals-bar-container">
                   <span
                     className="et-totals-bar et-totals-bar-tag"
@@ -738,7 +745,9 @@ export const CategoryPicker = ({
                       style={{ backgroundColor: colorMap[tag.uid] }}
                     />
                   )}
-                  <span className="et-picker-name et-tag-name">{catLabel(tag)}</span>
+                  <span className="et-picker-name et-tag-name">
+                    {catLabel(tag)}
+                  </span>
                 </label>
               </div>
             ))}
@@ -813,7 +822,13 @@ function buildTrendsCSV(data, selected, granularity) {
 /*──────────────────────────────────────────────────────────────────────────────
   TrendChart — Chart.js stacked/line/mixed chart
 ──────────────────────────────────────────────────────────────────────────────*/
-const TrendChart = ({ data, selected, fixedColors, granularity, chartType }) => {
+const TrendChart = ({
+  data,
+  selected,
+  fixedColors,
+  granularity,
+  chartType,
+}) => {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
 
@@ -913,7 +928,8 @@ const TrendChart = ({ data, selected, fixedColors, granularity, chartType }) => 
       const parentColor = uidColorMap[parentUid];
       childUids.forEach((cuid, ci) => {
         uidColorMap[cuid] =
-          fixedColors[cuid] || childTintColor(parentColor, ci, childUids.length);
+          fixedColors[cuid] ||
+          childTintColor(parentColor, ci, childUids.length);
       });
     }
 
@@ -1244,7 +1260,8 @@ function buildTrendsColorMap(data, selected, fixedColors) {
   let colorIndex = 0;
   for (const uid of selected) {
     if (stackedChildUids.has(uid)) continue;
-    map[uid] = fixedColors[uid] || CHART_COLORS[colorIndex % CHART_COLORS.length];
+    map[uid] =
+      fixedColors[uid] || CHART_COLORS[colorIndex % CHART_COLORS.length];
     colorIndex++;
   }
 
@@ -1252,7 +1269,8 @@ function buildTrendsColorMap(data, selected, fixedColors) {
   for (const [parentUid, childUids] of stackGroups) {
     const parentColor = map[parentUid];
     childUids.forEach((cuid, ci) => {
-      map[cuid] = fixedColors[cuid] || childTintColor(parentColor, ci, childUids.length);
+      map[cuid] =
+        fixedColors[cuid] || childTintColor(parentColor, ci, childUids.length);
     });
   }
 
@@ -1432,6 +1450,7 @@ const TimeDashboard = ({
   // mode: "dnp" (daily note pages survey) | "page" (single-page survey)
   const [mode, setMode] = useState(initialPageUid ? "page" : "dnp");
   const [pageUid, setPageUid] = useState(initialPageUid || null);
+  const [referenceDate] = useState(() => initialReferenceDate || new Date());
   const [period, setPeriod] = useState(() => {
     const preset = VALID_PERIODS.has(initialPeriod)
       ? initialPeriod
@@ -1465,7 +1484,7 @@ const TimeDashboard = ({
     setMode(newMode);
     // Switch to a sensible default period for each mode
     const preset = newMode === "page" ? "month" : "day";
-    const { startDate, endDate } = getDateRange(preset);
+    const { startDate, endDate } = getDateRange(preset, referenceDate);
     setPeriod({ preset, startDate, endDate });
   };
 
@@ -1541,6 +1560,7 @@ const TimeDashboard = ({
               preset={period.preset}
               startDate={period.startDate}
               endDate={period.endDate}
+              referenceDate={referenceDate}
               onChange={handlePeriodChange}
             />
 

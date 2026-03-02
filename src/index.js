@@ -13,6 +13,7 @@ import {
   getBlockAttributes,
   getCurrentBlockUidOrCreateIt,
   getMainPageUid,
+  getPageNameByPageUid,
   getPageUidByAnyBlockUid,
   getStringsAroundPlaceHolder,
   normalizeUID,
@@ -184,16 +185,15 @@ function registerPaletteCommands(extensionAPI) {
   //   },
   // });
 
-  // Deprecated, not reliable enough and no more useful since we have a Dashboard
-  // extensionAPI.ui.commandPalette.addCommand({
-  //   label:
-  //     "Time Tracker: Total according to natural language expression in current block",
-  //   callback: () => {
-  //     const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
-  //     if (!startUid) return;
-  //     totalTimeForGivenPeriod(null, startUid);
-  //   },
-  // });
+  extensionAPI.ui.commandPalette.addCommand({
+    label:
+      "Time Tracker: Total according to natural language expression in current block",
+    callback: () => {
+      const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
+      if (!startUid) return;
+      totalTimeForGivenPeriod(null, startUid);
+    },
+  });
   extensionAPI.ui.commandPalette.addCommand({
     label: "Time Tracker: Total for current page and all its references",
     callback: async () => {
@@ -251,18 +251,18 @@ function registerPaletteCommands(extensionAPI) {
       const pageUid = focusedUid
         ? getPageUidByAnyBlockUid(focusedUid)
         : await getMainPageUid();
-      const pageTitle = pageUid
-        ? window.roamAlphaAPI.pull("[:node/title]", [":block/uid", pageUid])?.[
-            ":node/title"
-          ]
-        : null;
+      const pageTitle = pageUid ? getPageNameByPageUid(pageUid) : null;
       const isDNP = pageTitle
         ? !!window.roamAlphaAPI.util.pageTitleToDate(pageTitle)
         : true;
+      const dnpDate =
+        isDNP && pageTitle
+          ? window.roamAlphaAPI.util.pageTitleToDate(pageTitle)
+          : undefined;
       openTimeDashboard(
         extensionAPI,
         undefined,
-        undefined,
+        dnpDate,
         isDNP ? null : pageUid,
         openManager,
       );

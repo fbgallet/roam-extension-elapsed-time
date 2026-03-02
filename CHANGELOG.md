@@ -2,13 +2,20 @@
 
 ### New feature:
 
-- Dashboard for visualization of Totals & Trends (charts)
+- Dashboard for visualization of Totals & Trends (charts) for DNP or specific Pages
 - Category manager dialog box
-- Category autocomplete picker
+- Category autocomplete picker with /Time tracker slash command (or Elapsed time Command palette command)
 
 ### Updates:
 
-- '#tags' are a new type of transversal category
+- '#tags' are a new and specific type of transversal category
+- Removed total per week/month/quarter/year from Command palette (use Dashboard or Smartblocks to get results inline)
+
+### Fixes
+
+- Bug if there was a blank block in category outline
+- TODO & DONE component were mispositioned after timestamp insertion
+- Certainly a lot of other small bugs have been fixed (since a major refactoring has been achieved)
 
 ## v.4 (May 3rd, 2024) important fixes
 
