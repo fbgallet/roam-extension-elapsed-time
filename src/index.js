@@ -27,7 +27,6 @@ import {
 } from "./categories";
 import { openCategoriesManager } from "./components/CategoriesManager";
 import { openTimeDashboard } from "./components/TimeDashboard";
-import { openPageTimeDashboard } from "./components/PageTimeDashboard";
 import { openCategoryPicker } from "./components/CategoryPicker";
 
 /************************* PANEL SETTINGS VAR **************************/
@@ -160,39 +159,41 @@ function registerPaletteCommands(extensionAPI) {
       totalTime(startUid, startUid, false);
     },
   });
-  extensionAPI.ui.commandPalette.addCommand({
-    label: "Time Tracker: Total for current week",
-    callback: async () => {
-      totalTimeForGivenPeriod("week");
-    },
-  });
-  extensionAPI.ui.commandPalette.addCommand({
-    label: "Time Tracker: Total for current month",
-    callback: async () => {
-      totalTimeForGivenPeriod("month");
-    },
-  });
-  extensionAPI.ui.commandPalette.addCommand({
-    label: "Time Tracker: Total for current quarter",
-    callback: async () => {
-      totalTimeForGivenPeriod("quarter");
-    },
-  });
-  extensionAPI.ui.commandPalette.addCommand({
-    label: "Time Tracker: Total for current year",
-    callback: async () => {
-      totalTimeForGivenPeriod("year");
-    },
-  });
-  extensionAPI.ui.commandPalette.addCommand({
-    label:
-      "Time Tracker: Total according to natural language expression in current block",
-    callback: () => {
-      const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
-      if (!startUid) return;
-      totalTimeForGivenPeriod(null, startUid);
-    },
-  });
+  // extensionAPI.ui.commandPalette.addCommand({
+  //   label: "Time Tracker: Total for current week",
+  //   callback: async () => {
+  //     totalTimeForGivenPeriod("week");
+  //   },
+  // });
+  // extensionAPI.ui.commandPalette.addCommand({
+  //   label: "Time Tracker: Total for current month",
+  //   callback: async () => {
+  //     totalTimeForGivenPeriod("month");
+  //   },
+  // });
+  // extensionAPI.ui.commandPalette.addCommand({
+  //   label: "Time Tracker: Total for current quarter",
+  //   callback: async () => {
+  //     totalTimeForGivenPeriod("quarter");
+  //   },
+  // });
+  // extensionAPI.ui.commandPalette.addCommand({
+  //   label: "Time Tracker: Total for current year",
+  //   callback: async () => {
+  //     totalTimeForGivenPeriod("year");
+  //   },
+  // });
+
+  // Deprecated, not reliable enough and no more useful since we have a Dashboard
+  // extensionAPI.ui.commandPalette.addCommand({
+  //   label:
+  //     "Time Tracker: Total according to natural language expression in current block",
+  //   callback: () => {
+  //     const startUid = window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
+  //     if (!startUid) return;
+  //     totalTimeForGivenPeriod(null, startUid);
+  //   },
+  // });
   extensionAPI.ui.commandPalette.addCommand({
     label: "Time Tracker: Total for current page and all its references",
     callback: async () => {
@@ -243,24 +244,28 @@ function registerPaletteCommands(extensionAPI) {
   });
 
   extensionAPI.ui.commandPalette.addCommand({
-    label: "Time Tracker: Open Dashboard",
-    callback: () => {
-      openTimeDashboard(extensionAPI);
-    },
-  });
-
-  extensionAPI.ui.commandPalette.addCommand({
-    label: "Time Tracker: Dashboard for current page",
+    label: "Time Tracker: Open Dashboard (Totals & Trends)",
     callback: async () => {
-      let scopeUid;
       const focusedUid =
         window.roamAlphaAPI.ui.getFocusedBlock()?.["block-uid"];
-      if (!focusedUid) {
-        scopeUid = await getMainPageUid();
-      } else {
-        scopeUid = getPageUidByAnyBlockUid(focusedUid);
-      }
-      openPageTimeDashboard(extensionAPI, "month", undefined, scopeUid);
+      const pageUid = focusedUid
+        ? getPageUidByAnyBlockUid(focusedUid)
+        : await getMainPageUid();
+      const pageTitle = pageUid
+        ? window.roamAlphaAPI.pull("[:node/title]", [":block/uid", pageUid])?.[
+            ":node/title"
+          ]
+        : null;
+      const isDNP = pageTitle
+        ? !!window.roamAlphaAPI.util.pageTitleToDate(pageTitle)
+        : true;
+      openTimeDashboard(
+        extensionAPI,
+        undefined,
+        undefined,
+        isDNP ? null : pageUid,
+        openManager,
+      );
     },
   });
 
@@ -269,7 +274,7 @@ function registerPaletteCommands(extensionAPI) {
 
 function registerSlashCommands(extensionAPI) {
   window.roamAlphaAPI.ui.slashCommand.addCommand({
-    label: "Time tracker",
+    label: "Time tracker: Now or Elapsed time",
     callback: (args) => {
       const startUid = args["block-uid"];
       const openManager = () =>
@@ -402,11 +407,16 @@ export default {
           action: {
             type: "button",
             onClick: () => {
-              openCategoriesManager(extensionAPI, categoriesUID, limitsUID, (uid) => {
-                categoriesUID = uid;
-                addPullWatch(uid, getCategories);
-                updateOpenCategoriesCommand(extensionAPI);
-              });
+              openCategoriesManager(
+                extensionAPI,
+                categoriesUID,
+                limitsUID,
+                (uid) => {
+                  categoriesUID = uid;
+                  addPullWatch(uid, getCategories);
+                  updateOpenCategoriesCommand(extensionAPI);
+                },
+              );
             },
             content: "Manage categories...",
           },
@@ -741,8 +751,11 @@ export default {
         btn.classList.contains("rm-xparser-default-Total") &&
         btn.classList.contains("dashboard")
       ) {
-        const { period, referenceDate } = parseDashboardPeriodFromClick(e);
-        openTimeDashboard(extensionAPI, period, referenceDate);
+        const { period, referenceDate, pageUid } =
+          parseDashboardPeriodFromClick(e);
+        openTimeDashboard(extensionAPI, period, referenceDate, pageUid, () =>
+          openCategoriesManager(extensionAPI, categoriesUID, limitsUID, null),
+        );
       }
     };
     document.addEventListener("click", handleXparserButtonClick, true);
@@ -752,6 +765,9 @@ export default {
   },
   onunload: () => {
     console.log("Elapsed Time Calculator unloaded.");
+    window.roamAlphaAPI.ui.slashCommand.removeCommand({
+      label: "Time tracker: Now or Elapsed time",
+    });
     if (categoriesUID) removePullWatch(categoriesUID, getCategories);
     if (limitsUID) removePullWatch(limitsUID, getLimits);
     if (_extensionAPI._xparserButtonClickHandler)

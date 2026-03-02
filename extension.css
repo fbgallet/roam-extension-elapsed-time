@@ -769,6 +769,10 @@ span.rm-page-ref[data-tag=".good-time"] {
   font-size: 12px;
 }
 
+.et-picker-label input[type="checkbox"] {
+  margin: 0;
+}
+
 .et-picker-name {
   white-space: nowrap;
   overflow: hidden;
@@ -777,9 +781,10 @@ span.rm-page-ref[data-tag=".good-time"] {
 }
 
 .et-color-swatch {
+  margin-top: 1px;
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 2px;
   flex-shrink: 0;
 }
@@ -972,4 +977,94 @@ span.rm-page-ref[data-tag=".good-time"] {
   font-size: 13px;
   opacity: 0.6;
   flex-shrink: 0;
+}
+
+/*──────────────────────────────────────────────────────────────────────────────
+  Dashboard mode switcher (Daily Notes / Page toggle in header)
+──────────────────────────────────────────────────────────────────────────────*/
+.bp3-dialog-header .et-mode-switcher {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+/*──────────────────────────────────────────────────────────────────────────────
+  Page selector (autocomplete + favorites)
+──────────────────────────────────────────────────────────────────────────────*/
+.et-page-selector {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.et-page-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.et-page-input {
+  flex: 1;
+  height: 28px !important;
+  font-size: 13px !important;
+}
+
+.et-fav-btn {
+  font-size: 14px !important;
+  color: #c5cdd3 !important;
+  padding: 0 4px !important;
+  line-height: 1 !important;
+}
+
+.et-fav-btn:hover {
+  color: #d9822b !important;
+}
+
+.et-fav-active {
+  color: #d9822b !important;
+}
+
+.et-page-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.et-page-popover-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7c7caa;
+  padding: 6px 10px 2px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.et-page-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #182026;
+}
+
+.et-page-popover-item:hover {
+  background: rgba(16, 107, 163, 0.08);
+}
+
+.et-page-popover-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

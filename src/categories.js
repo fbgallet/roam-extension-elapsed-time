@@ -54,7 +54,7 @@ export class Category {
     this.parent = parent;
     this.isTag = false;
     this.ref =
-      this.type === "pageRef"
+      this.type === "pageRef" && refs?.length
         ? refs.length === 1
           ? refs[0]["uid"]
           : // in case of nested page title, get the longest (wrapping the other)
@@ -200,6 +200,7 @@ export function getCategories(parentUid) {
     triggerTree = [...triggerTree].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     for (let i = 0; i < triggerTree.length; i++) {
       let w = triggerTree[i];
+      if (!w.string?.trim()) continue; // skip blank blocks
       let hide = false;
       if (w.string.includes("{hide}")) {
         hide = true;
@@ -228,6 +229,7 @@ export function getCategories(parentUid) {
   function getSubCategories(tree, topTrigger, hideTop) {
     tree = [...tree].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     for (let j = 0; j < tree.length; j++) {
+      if (!tree[j].string?.trim()) continue; // skip blank blocks
       let hideSub = false;
       let t = tree[j].string;
       if (t.includes("{hide}")) {

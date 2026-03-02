@@ -139,6 +139,32 @@ export function getPageUidByTitle(title) {
   else return null;
 }
 
+let _allPagesCache = null;
+
+/** Return all graph pages as [{title, uid}], cached until next call with reset=true. */
+export function getAllPages(reset = false) {
+  if (!reset && _allPagesCache) return _allPagesCache;
+  const results = window.roamAlphaAPI.q(
+    `[:find ?title ?uid :where [?p :node/title ?title] [?p :block/uid ?uid]]`
+  );
+  _allPagesCache = results.map(([title, uid]) => ({ title, uid }));
+  return _allPagesCache;
+}
+
+/** Search pages by substring query (case-insensitive). Returns up to `limit` matches sorted by match position. */
+export function searchPages(query, limit = 10) {
+  if (!query) return [];
+  const lq = query.toLowerCase();
+  return getAllPages()
+    .filter((p) => p.title.toLowerCase().includes(lq))
+    .sort((a, b) => {
+      const ai = a.title.toLowerCase().indexOf(lq);
+      const bi = b.title.toLowerCase().indexOf(lq);
+      return ai - bi || a.title.localeCompare(b.title);
+    })
+    .slice(0, limit);
+}
+
 export function getPageUidByPageName(page) {
   let p = window.roamAlphaAPI.q(`[:find (pull ?e [:block/uid]) 
 							     :where [?e :node/title "${page}"]]`);
@@ -578,6 +604,7 @@ export function parseDashboardPeriodFromClick(e) {
 
   // Resolve the page the button lives on
   let referenceDate;
+  let pageUidForDashboard;
   if (blockUid) {
     const pageUid = getPageUidByAnyBlockUid(blockUid);
     if (pageUid) {
@@ -593,9 +620,12 @@ export function parseDashboardPeriodFromClick(e) {
         if (pageDate.getTime() !== today.getTime()) {
           referenceDate = pageDate;
         }
+      } else {
+        // Non-DNP page: pass pageUid so dashboard opens in Page mode
+        pageUidForDashboard = pageUid;
       }
     }
   }
 
-  return { period, referenceDate };
+  return { period, referenceDate, pageUid: pageUidForDashboard };
 }

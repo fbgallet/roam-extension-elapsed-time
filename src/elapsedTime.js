@@ -36,6 +36,7 @@ var appendHourTag = false; // add a tag with the round current hour, like #19:00
 
 const timestampRegex = /[0-9]{1,2}:[0-9]{1,2}/g;
 const timestampButtonRegex = /{{[^\}]*:SmartBlock:[^\}]*buttons?}}/;
+const todoPrefix = /^\s*\{\{\[\[(TODO|DONE)\]\]\}\}\s*/;
 class TimeStamp {
   constructor(stringTT) {
     this.original = stringTT;
@@ -78,7 +79,15 @@ export async function elapsedTime(blockUID, separator = null) {
       if (matchingButton[0].includes("Double"))
         nowTS += " {{⇥🕞:SmartBlock:Elapsed time}}";
       blockContent = blockContent.replace(matchingButton[0], nowTS);
-    } else blockContent = nowTS + " " + blockContent;
+    } else {
+      let todoMatch = blockContent.match(todoPrefix);
+      if (todoMatch) {
+        blockContent =
+          todoMatch[0] + nowTS + " " + blockContent.slice(todoMatch[0].length);
+      } else {
+        blockContent = nowTS + " " + blockContent;
+      }
+    }
     let focusedBlock = window.roamAlphaAPI.ui.getFocusedBlock();
     updateBlock(blockUID, blockContent);
     setTimeout(() => {

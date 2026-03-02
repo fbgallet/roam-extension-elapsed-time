@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { renderOverlay } from "./renderOverlay";
 import { Chart, registerables } from "chart.js";
 import { categoriesArray, onCategoriesChange } from "../categories";
@@ -10,8 +16,18 @@ import {
   aggregateByMonth,
   formatDateLabel,
 } from "../dashboardData";
-import { convertMinutesTohhmm } from "../util";
+import { getDashboardDataForPage } from "../pageDashboardData";
+import { convertMinutesTohhmm, resolveReferences } from "../util";
+
+const BLOCK_REF_RE = /\(\([^\)]{9}\)\)/;
+/** Return displayName if it looks resolved, otherwise re-resolve at render time. */
+function catLabel(cat) {
+  const name = cat?.displayName || cat?.name || "";
+  if (!BLOCK_REF_RE.test(name)) return name;
+  return resolveReferences(name) || name;
+}
 import { getCategoryColorsMap } from "./CategoriesManager";
+import PageSelector from "./PageSelector";
 
 Chart.register(...registerables);
 
@@ -39,13 +55,20 @@ function hexToRgb(hex) {
 }
 
 function rgbToHex(r, g, b) {
-  return "#" + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  return (
+    "#" +
+    [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")
+  );
 }
 
 /** Blend color toward white by factor (0=original, 1=white) */
 function lightenColor(hex, factor) {
   const [r, g, b] = hexToRgb(hex);
-  return rgbToHex(r + (255 - r) * factor, g + (255 - g) * factor, b + (255 - b) * factor);
+  return rgbToHex(
+    r + (255 - r) * factor,
+    g + (255 - g) * factor,
+    b + (255 - b) * factor,
+  );
 }
 
 /**
@@ -60,7 +83,8 @@ function childTintColor(parentColor, childIndex, totalChildren) {
   const factor =
     totalChildren === 1
       ? (minLighten + maxLighten) / 2
-      : minLighten + (childIndex / (totalChildren - 1)) * (maxLighten - minLighten);
+      : minLighten +
+        (childIndex / (totalChildren - 1)) * (maxLighten - minLighten);
   return lightenColor(parentColor, factor);
 }
 
@@ -93,7 +117,7 @@ export const PeriodSelector = ({ preset, startDate, endDate, onChange }) => {
       preset,
       startDate,
       endDate,
-      direction
+      direction,
     );
     onChange({ preset, startDate: s, endDate: e });
   };
@@ -210,7 +234,17 @@ function presetToInterval(preset) {
 /*──────────────────────────────────────────────────────────────────────────────
   TotalsCategoryRow — recursive row with horizontal bar
 ──────────────────────────────────────────────────────────────────────────────*/
-const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle, interval, fixedColors, catColor }) => {
+const TotalsCategoryRow = ({
+  cat,
+  totals,
+  maxTime,
+  depth,
+  expandedSet,
+  onToggle,
+  interval,
+  fixedColors,
+  catColor,
+}) => {
   const time = totals[cat.uid] || 0;
   if (time === 0) return null;
 
@@ -237,18 +271,18 @@ const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle,
   if (isStacked) {
     const childrenTotal = activeChildren.reduce(
       (sum, child) => sum + (totals[child.uid] || 0),
-      0
+      0,
     );
     const ownTime = Math.max(time - childrenTotal, 0);
     segments = [
-      ...(ownTime > 0
-        ? [{ uid: cat.uid + "_own", time: ownTime, color }]
-        : []),
+      ...(ownTime > 0 ? [{ uid: cat.uid + "_own", time: ownTime, color }] : []),
       ...activeChildren.map((child, i) => ({
         uid: child.uid,
         name: child.name,
         time: totals[child.uid],
-        color: fixedColors?.[child.uid] || childTintColor(color, i, activeChildren.length),
+        color:
+          fixedColors?.[child.uid] ||
+          childTintColor(color, i, activeChildren.length),
         borderColor: color,
       })),
     ];
@@ -267,12 +301,17 @@ const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle,
         >
           {isExpanded ? "▾" : "▸"}
         </span>
-        <span className="et-totals-name">{cat.name}</span>
+        <span className="et-totals-name">{catLabel(cat)}</span>
         <span className="et-totals-bar-container">
           {isStacked ? (
             <span
               className="et-totals-bar-inner"
-              style={{ width: `${barWidth}%`, outline: depth === 0 ? `1.5px solid ${color}` : undefined, outlineOffset: "-1px", borderRadius: 3 }}
+              style={{
+                width: `${barWidth}%`,
+                outline: depth === 0 ? `1.5px solid ${color}` : undefined,
+                outlineOffset: "-1px",
+                borderRadius: 3,
+              }}
             >
               {segments.map((seg) => (
                 <span
@@ -281,9 +320,15 @@ const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle,
                   style={{
                     width: `${(seg.time / time) * 100}%`,
                     backgroundColor: seg.color,
-                    ...(seg.borderColor ? { boxShadow: `inset 0 0 0 1px ${seg.borderColor}` } : {}),
+                    ...(seg.borderColor
+                      ? { boxShadow: `inset 0 0 0 1px ${seg.borderColor}` }
+                      : {}),
                   }}
-                  title={seg.name ? `${seg.name}: ${convertMinutesTohhmm(seg.time)}` : undefined}
+                  title={
+                    seg.name
+                      ? `${seg.name}: ${convertMinutesTohhmm(seg.time)}`
+                      : undefined
+                  }
                 />
               ))}
             </span>
@@ -329,7 +374,10 @@ const TotalsCategoryRow = ({ cat, totals, maxTime, depth, expandedSet, onToggle,
             onToggle={onToggle}
             interval={interval}
             fixedColors={fixedColors}
-            catColor={fixedColors?.[child.uid] || childTintColor(color, ci, cat.children.length)}
+            catColor={
+              fixedColors?.[child.uid] ||
+              childTintColor(color, ci, cat.children.length)
+            }
           />
         ))}
     </>
@@ -351,10 +399,14 @@ function buildTotalsClipboardText(data) {
   };
   walk(data.categories);
   if (data.uncategorized.total > 0)
-    lines.push(`Uncategorized\t${convertMinutesTohhmm(data.uncategorized.total)}`);
-  const activeTags = (data.tags || []).filter((t) => (data.totals[t.uid] || 0) > 0);
+    lines.push(
+      `Uncategorized\t${convertMinutesTohhmm(data.uncategorized.total)}`,
+    );
+  const activeTags = (data.tags || []).filter(
+    (t) => (data.totals[t.uid] || 0) > 0,
+  );
   activeTags.forEach((t) =>
-    lines.push(`${t.name}\t${convertMinutesTohhmm(data.totals[t.uid])}`)
+    lines.push(`${t.name}\t${convertMinutesTohhmm(data.totals[t.uid])}`),
   );
   lines.push(`Total\t${convertMinutesTohhmm(data.grandTotal)}`);
   return lines.join("\n");
@@ -398,7 +450,7 @@ export const TotalsView = ({ data, preset, fixedColors, scopeCategory }) => {
   const otherCategories = useMemo(() => {
     if (!scopeCategory) return [];
     return data.categories.filter(
-      (c) => c.uid !== scopeCategory.uid && (data.totals[c.uid] || 0) > 0
+      (c) => c.uid !== scopeCategory.uid && (data.totals[c.uid] || 0) > 0,
     );
   }, [data, scopeCategory]);
 
@@ -406,10 +458,12 @@ export const TotalsView = ({ data, preset, fixedColors, scopeCategory }) => {
   const maxTime = Math.max(
     ...displayCategories.map((cat) => data.totals[cat.uid] || 0),
     ...otherCategories.map((cat) => data.totals[cat.uid] || 0),
-    data.uncategorized.total
+    data.uncategorized.total,
   );
 
-  const activeTags = (data.tags || []).filter((t) => (data.totals[t.uid] || 0) > 0);
+  const activeTags = (data.tags || []).filter(
+    (t) => (data.totals[t.uid] || 0) > 0,
+  );
 
   return (
     <div className="et-totals-view">
@@ -436,12 +490,16 @@ export const TotalsView = ({ data, preset, fixedColors, scopeCategory }) => {
           onToggle={handleToggle}
           interval={interval}
           fixedColors={fixedColors}
-          catColor={fixedColors?.[cat.uid] || CHART_COLORS[i % CHART_COLORS.length]}
+          catColor={
+            fixedColors?.[cat.uid] || CHART_COLORS[i % CHART_COLORS.length]
+          }
         />
       ))}
       {data.uncategorized.total > 0 && (
         <div className="et-totals-row et-totals-top" style={{ paddingLeft: 8 }}>
-          <span className="et-expand-arrow" style={{ visibility: "hidden" }}>▸</span>
+          <span className="et-expand-arrow" style={{ visibility: "hidden" }}>
+            ▸
+          </span>
           <span className="et-totals-name" style={{ fontStyle: "italic" }}>
             Uncategorized
           </span>
@@ -463,15 +521,30 @@ export const TotalsView = ({ data, preset, fixedColors, scopeCategory }) => {
           <div className="et-tags-section-header">Tags</div>
           {activeTags.map((tag) => {
             const time = data.totals[tag.uid] || 0;
-            const barWidth = maxTime > 0 ? Math.max((time / maxTime) * 100, 2) : 0;
+            const barWidth =
+              maxTime > 0 ? Math.max((time / maxTime) * 100, 2) : 0;
             return (
-              <div key={tag.uid} className="et-totals-row et-totals-tag" style={{ paddingLeft: 8 }}>
-                <span className="et-expand-arrow" style={{ visibility: "hidden" }}>▸</span>
-                <span className="et-totals-name et-tag-name">{tag.name}</span>
-                <span className="et-totals-bar-container">
-                  <span className="et-totals-bar et-totals-bar-tag" style={{ width: `${barWidth}%` }} />
+              <div
+                key={tag.uid}
+                className="et-totals-row et-totals-tag"
+                style={{ paddingLeft: 8 }}
+              >
+                <span
+                  className="et-expand-arrow"
+                  style={{ visibility: "hidden" }}
+                >
+                  ▸
                 </span>
-                <span className="et-totals-time">{convertMinutesTohhmm(time)}</span>
+                <span className="et-totals-name et-tag-name">{catLabel(tag)}</span>
+                <span className="et-totals-bar-container">
+                  <span
+                    className="et-totals-bar et-totals-bar-tag"
+                    style={{ width: `${barWidth}%` }}
+                  />
+                </span>
+                <span className="et-totals-time">
+                  {convertMinutesTohhmm(time)}
+                </span>
               </div>
             );
           })}
@@ -491,7 +564,9 @@ export const TotalsView = ({ data, preset, fixedColors, scopeCategory }) => {
               onToggle={handleToggle}
               interval={interval}
               fixedColors={fixedColors}
-              catColor={fixedColors?.[cat.uid] || CHART_COLORS[i % CHART_COLORS.length]}
+              catColor={
+                fixedColors?.[cat.uid] || CHART_COLORS[i % CHART_COLORS.length]
+              }
             />
           ))}
         </div>
@@ -503,7 +578,15 @@ export const TotalsView = ({ data, preset, fixedColors, scopeCategory }) => {
 /*──────────────────────────────────────────────────────────────────────────────
   CategoryPicker — checkbox tree for the Trends tab
 ──────────────────────────────────────────────────────────────────────────────*/
-const CategoryPickerNode = ({ cat, depth, selected, onToggle, colorMap, expandedSet, onToggleExpand }) => {
+const CategoryPickerNode = ({
+  cat,
+  depth,
+  selected,
+  onToggle,
+  colorMap,
+  expandedSet,
+  onToggleExpand,
+}) => {
   const hasChildren = cat.children?.length > 0;
   const isExpanded = expandedSet.has(cat.uid);
   const isSelected = selected.has(cat.uid);
@@ -520,7 +603,11 @@ const CategoryPickerNode = ({ cat, depth, selected, onToggle, colorMap, expanded
             {isExpanded ? "▾" : "▸"}
           </span>
         )}
-        {!hasChildren && <span className="et-expand-arrow" style={{ visibility: "hidden" }}>▸</span>}
+        {!hasChildren && (
+          <span className="et-expand-arrow" style={{ visibility: "hidden" }}>
+            ▸
+          </span>
+        )}
         <label className="et-picker-label">
           <input
             type="checkbox"
@@ -533,7 +620,7 @@ const CategoryPickerNode = ({ cat, depth, selected, onToggle, colorMap, expanded
               style={{ backgroundColor: color }}
             />
           )}
-          <span className="et-picker-name">{cat.name}</span>
+          <span className="et-picker-name">{catLabel(cat)}</span>
         </label>
       </div>
       {isExpanded &&
@@ -554,7 +641,14 @@ const CategoryPickerNode = ({ cat, depth, selected, onToggle, colorMap, expanded
   );
 };
 
-export const CategoryPicker = ({ categories, tags, totals, selected, onSelectionChange, colorMap }) => {
+export const CategoryPicker = ({
+  categories,
+  tags,
+  totals,
+  selected,
+  onSelectionChange,
+  colorMap,
+}) => {
   const [expandedSet, setExpandedSet] = useState(() => new Set());
 
   const handleToggle = (uid) => {
@@ -591,8 +685,18 @@ export const CategoryPicker = ({ categories, tags, totals, selected, onSelection
   return (
     <div className="et-category-picker">
       <div className="et-picker-actions">
-        <button className="bp3-button bp3-minimal bp3-small" onClick={handleSelectAll}>All</button>
-        <button className="bp3-button bp3-minimal bp3-small" onClick={handleSelectNone}>None</button>
+        <button
+          className="bp3-button bp3-minimal bp3-small"
+          onClick={handleSelectAll}
+        >
+          All
+        </button>
+        <button
+          className="bp3-button bp3-minimal bp3-small"
+          onClick={handleSelectNone}
+        >
+          None
+        </button>
       </div>
       <div className="et-picker-list">
         {categories.map((cat) => (
@@ -611,8 +715,17 @@ export const CategoryPicker = ({ categories, tags, totals, selected, onSelection
           <>
             <div className="et-picker-section-label">Tags</div>
             {activeTags.map((tag) => (
-              <div key={tag.uid} className="et-picker-row et-picker-tag-row" style={{ paddingLeft: 4 }}>
-                <span className="et-expand-arrow" style={{ visibility: "hidden" }}>▸</span>
+              <div
+                key={tag.uid}
+                className="et-picker-row et-picker-tag-row"
+                style={{ paddingLeft: 4 }}
+              >
+                <span
+                  className="et-expand-arrow"
+                  style={{ visibility: "hidden" }}
+                >
+                  ▸
+                </span>
                 <label className="et-picker-label">
                   <input
                     type="checkbox"
@@ -620,9 +733,12 @@ export const CategoryPicker = ({ categories, tags, totals, selected, onSelection
                     onChange={() => handleToggle(tag.uid)}
                   />
                   {colorMap[tag.uid] && (
-                    <span className="et-color-swatch" style={{ backgroundColor: colorMap[tag.uid] }} />
+                    <span
+                      className="et-color-swatch"
+                      style={{ backgroundColor: colorMap[tag.uid] }}
+                    />
                   )}
-                  <span className="et-picker-name et-tag-name">{tag.name}</span>
+                  <span className="et-picker-name et-tag-name">{catLabel(tag)}</span>
                 </label>
               </div>
             ))}
@@ -666,7 +782,10 @@ function buildTrendsCSV(data, selected, granularity) {
     bucketData = agg.aggregated;
   } else {
     labels = days.map((uid) => {
-      const title = window.roamAlphaAPI.pull("[:node/title]", [":block/uid", uid])?.[":node/title"];
+      const title = window.roamAlphaAPI.pull("[:node/title]", [
+        ":block/uid",
+        uid,
+      ])?.[":node/title"];
       if (!title) return uid;
       const date = window.roamAlphaAPI.util.pageTitleToDate(title);
       return date ? formatDateLabel(date) : title;
@@ -675,7 +794,9 @@ function buildTrendsCSV(data, selected, granularity) {
     bucketData = data.matrix;
   }
 
-  const header = ["Period", ...selectedCats.map((c) => c.name), "Total"].join(",");
+  const header = ["Period", ...selectedCats.map((c) => c.name), "Total"].join(
+    ",",
+  );
   const rows = bucketKeys.map((key, i) => {
     const dayData = bucketData[key] || {};
     const values = selectedCats.map((c) => dayData[c.uid] || 0);
@@ -690,9 +811,9 @@ function buildTrendsCSV(data, selected, granularity) {
 }
 
 /*──────────────────────────────────────────────────────────────────────────────
-  TrendChart — Chart.js stacked/grouped bar chart
+  TrendChart — Chart.js stacked/line/mixed chart
 ──────────────────────────────────────────────────────────────────────────────*/
-const TrendChart = ({ data, selected, colorMap, granularity }) => {
+const TrendChart = ({ data, selected, fixedColors, granularity, chartType }) => {
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
 
@@ -700,16 +821,25 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
     if (!canvasRef.current || !data) return;
 
     const days = data.days;
-    const allCats = flattenCategories([...data.categories, ...(data.tags || [])]);
+    const allCats = flattenCategories([
+      ...data.categories,
+      ...(data.tags || []),
+    ]);
 
     // Determine bucket data based on chosen granularity
     let labels, bucketKeys, bucketData;
-    if (granularity === "month" || (granularity === "auto" && days.length > 56)) {
+    if (
+      granularity === "month" ||
+      (granularity === "auto" && days.length > 56)
+    ) {
       const agg = aggregateByMonth(data.matrix, days);
       labels = agg.labels;
       bucketKeys = Object.keys(agg.aggregated);
       bucketData = agg.aggregated;
-    } else if (granularity === "week" || (granularity === "auto" && days.length > 14)) {
+    } else if (
+      granularity === "week" ||
+      (granularity === "auto" && days.length > 14)
+    ) {
       const agg = aggregateByWeek(data.matrix, days);
       labels = agg.labels;
       bucketKeys = Object.keys(agg.aggregated);
@@ -723,7 +853,10 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
     } else {
       // Daily
       labels = days.map((uid) => {
-        const title = window.roamAlphaAPI.pull("[:node/title]", [":block/uid", uid])?.[":node/title"];
+        const title = window.roamAlphaAPI.pull("[:node/title]", [
+          ":block/uid",
+          uid,
+        ])?.[":node/title"];
         if (!title) return uid;
         const date = window.roamAlphaAPI.util.pageTitleToDate(title);
         return date ? formatDateLabel(date) : title;
@@ -742,9 +875,14 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
     const walkForStackGroups = (cats) => {
       for (const cat of cats) {
         if (selectedSet.has(cat.uid)) {
-          const selectedChildren = (cat.children || []).filter((c) => selectedSet.has(c.uid));
+          const selectedChildren = (cat.children || []).filter((c) =>
+            selectedSet.has(c.uid),
+          );
           if (selectedChildren.length > 0) {
-            stackGroups.set(cat.uid, selectedChildren.map((c) => c.uid));
+            stackGroups.set(
+              cat.uid,
+              selectedChildren.map((c) => c.uid),
+            );
           }
         }
         if (cat.children?.length) walkForStackGroups(cat.children);
@@ -760,21 +898,22 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
     const datasets = [];
     const uidColorMap = {};
 
-    // Assign colors: use prop colorMap when available, fallback to CHART_COLORS
-    // Assign base colors to top-level (non-stacked-child) categories only
+    // Assign colors: fixed user colors take priority, fallback to CHART_COLORS.
+    // Assign base colors to top-level (non-stacked-child) categories only.
     let colorIndex = 0;
     for (const uid of selectedSet) {
       if (stackedChildUids.has(uid)) continue; // child tints computed later
-      uidColorMap[uid] = colorMap[uid] || CHART_COLORS[colorIndex % CHART_COLORS.length];
+      uidColorMap[uid] =
+        fixedColors[uid] || CHART_COLORS[colorIndex % CHART_COLORS.length];
       colorIndex++;
     }
 
     // Assign tinted colors to stacked children based on their parent's color.
-    // Use wider lightening range and start darker so tiers are clearly distinct.
     for (const [parentUid, childUids] of stackGroups) {
       const parentColor = uidColorMap[parentUid];
       childUids.forEach((cuid, ci) => {
-        uidColorMap[cuid] = colorMap[cuid] || childTintColor(parentColor, ci, childUids.length);
+        uidColorMap[cuid] =
+          fixedColors[cuid] || childTintColor(parentColor, ci, childUids.length);
       });
     }
 
@@ -784,6 +923,9 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
       stackBorderColors[parentUid] = uidColorMap[parentUid];
     }
 
+    const useLines = chartType === "line";
+    const useBoth = chartType === "both";
+
     for (const uid of selectedSet) {
       // Skip children that will be rendered inside their parent's stack group
       if (stackedChildUids.has(uid)) continue;
@@ -791,18 +933,33 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
       const cat = allCats.find((c) => c.uid === uid);
       const color = uidColorMap[uid];
 
-      if (stackGroups.has(uid)) {
+      if (useLines) {
+        // Pure line mode — exact values, one line per category
+        datasets.push({
+          type: "line",
+          label: catLabel(cat) || uid,
+          data: bucketKeys.map((key) => bucketData[key]?.[uid] || 0),
+          borderColor: color,
+          backgroundColor: color + "33",
+          borderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          tension: 0.3,
+          fill: false,
+          order: 0,
+        });
+      } else if (stackGroups.has(uid)) {
         // This parent has selected children → render as stacked group.
         const childUids = stackGroups.get(uid);
 
         // Parent's own segment (bottom of stack)
         datasets.push({
-          label: cat?.name || uid,
+          label: catLabel(cat) || uid,
           data: bucketKeys.map((key) => {
             const parentTime = bucketData[key]?.[uid] || 0;
             const childrenTime = childUids.reduce(
               (sum, cuid) => sum + (bucketData[key]?.[cuid] || 0),
-              0
+              0,
             );
             return Math.max(parentTime - childrenTime, 0);
           }),
@@ -810,29 +967,66 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
           borderWidth: 0,
           borderRadius: 0,
           stack: uid,
+          order: 1,
         });
 
         // One dataset per selected child — tinted, no individual borders
         childUids.forEach((cuid, ci) => {
           const childCat = allCats.find((c) => c.uid === cuid);
           datasets.push({
-            label: childCat?.name || cuid,
+            label: catLabel(childCat) || cuid,
             data: bucketKeys.map((key) => bucketData[key]?.[cuid] || 0),
             backgroundColor: uidColorMap[cuid],
             borderWidth: 0,
             borderRadius: ci === childUids.length - 1 ? 2 : 0,
             stack: uid,
+            order: 1,
           });
         });
       } else {
         // Standalone category bar
         datasets.push({
-          label: cat?.name || uid,
+          label: catLabel(cat) || uid,
           data: bucketKeys.map((key) => bucketData[key]?.[uid] || 0),
           backgroundColor: color,
           borderWidth: 0,
           borderRadius: 2,
           stack: uid,
+          order: 1,
+        });
+      }
+    }
+
+    // In "both" mode: add a moving-average line overlay for every top-level
+    // selected category (i.e. non-stacked-child). Window = 3 centered points.
+    if (useBoth) {
+      const maWindow = 3;
+      for (const uid of selectedSet) {
+        if (stackedChildUids.has(uid)) continue;
+        const cat = allCats.find((c) => c.uid === uid);
+        const color = uidColorMap[uid];
+        const rawValues = bucketKeys.map((key) => bucketData[key]?.[uid] || 0);
+        const maValues = rawValues.map((_, i) => {
+          const half = Math.floor(maWindow / 2);
+          const from = Math.max(0, i - half);
+          const to = Math.min(rawValues.length - 1, i + half);
+          const slice = rawValues.slice(from, to + 1);
+          return slice.reduce((a, b) => a + b, 0) / slice.length;
+        });
+        datasets.push({
+          type: "line",
+          label: `~ ${catLabel(cat) || uid}`,
+          data: maValues,
+          borderColor: color,
+          backgroundColor: "transparent",
+          borderWidth: 2,
+          borderDash: [5, 4],
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.4,
+          fill: false,
+          stack: undefined,
+          order: 0, // lower = drawn later = on top; bars default to 1
         });
       }
     }
@@ -885,8 +1079,20 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
       if (!cat?.limits) continue;
       const goalVal = cat.limits.goal?.[limitInterval] || 0;
       const limitVal = cat.limits.limit?.[limitInterval] || 0;
-      if (goalVal > 0) limitLines.push({ value: goalVal, color: "#29A634", label: `${cat.name} goal`, dash: [6, 3] });
-      if (limitVal > 0) limitLines.push({ value: limitVal, color: "#D13913", label: `${cat.name} limit`, dash: [6, 3] });
+      if (goalVal > 0)
+        limitLines.push({
+          value: goalVal,
+          color: "#29A634",
+          label: `${catLabel(cat)} goal`,
+          dash: [6, 3],
+        });
+      if (limitVal > 0)
+        limitLines.push({
+          value: limitVal,
+          color: "#D13913",
+          label: `${catLabel(cat)} limit`,
+          dash: [6, 3],
+        });
     }
 
     const limitLinesPlugin = {
@@ -897,7 +1103,12 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
         const yScale = scales.y;
         ctx.save();
         ctx.beginPath();
-        ctx.rect(chartArea.left, chartArea.top, chartArea.width, chartArea.height);
+        ctx.rect(
+          chartArea.left,
+          chartArea.top,
+          chartArea.width,
+          chartArea.height,
+        );
         ctx.clip();
         limitLines.forEach(({ value, color, label, dash }) => {
           const y = yScale.getPixelForValue(value);
@@ -920,6 +1131,8 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
     };
 
     if (chartRef.current) chartRef.current.destroy();
+
+    const stackedAxes = chartType !== "line";
 
     chartRef.current = new Chart(canvasRef.current, {
       type: "bar",
@@ -944,7 +1157,7 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
         },
         scales: {
           y: {
-            stacked: true,
+            stacked: stackedAxes,
             beginAtZero: true,
             ticks: {
               callback: (val) => convertMinutesTohhmm(val),
@@ -953,7 +1166,7 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
             grid: { color: "rgba(0,0,0,0.06)" },
           },
           x: {
-            stacked: true,
+            stacked: stackedAxes,
             ticks: { font: { size: 11 } },
             grid: { display: false },
           },
@@ -967,10 +1180,9 @@ const TrendChart = ({ data, selected, colorMap, granularity }) => {
         chartRef.current = null;
       }
     };
-  }, [data, selected, granularity, colorMap]);
+  }, [data, selected, granularity, fixedColors, chartType]);
 
-  if (!data)
-    return <p className="et-empty-message">Loading...</p>;
+  if (!data) return <p className="et-empty-message">Loading...</p>;
   if (selected.size === 0)
     return (
       <div className="et-chart-container et-chart-empty">
@@ -997,11 +1209,71 @@ function flattenCategories(categories) {
   return result;
 }
 
+/**
+ * Build a uid→color map for the Trends tab that mirrors TrendChart's color
+ * assignment: fixed user colors take priority; children without a fixed color
+ * get a tint derived from their parent's color (same logic as Totals tab).
+ */
+function buildTrendsColorMap(data, selected, fixedColors) {
+  if (!data) return fixedColors;
+
+  // Find parent→selected-children relationships
+  const stackGroups = new Map();
+  const walkForStackGroups = (cats) => {
+    for (const cat of cats) {
+      if (selected.has(cat.uid)) {
+        const selectedChildren = (cat.children || []).filter((c) =>
+          selected.has(c.uid),
+        );
+        if (selectedChildren.length > 0) {
+          stackGroups.set(
+            cat.uid,
+            selectedChildren.map((c) => c.uid),
+          );
+        }
+      }
+      if (cat.children?.length) walkForStackGroups(cat.children);
+    }
+  };
+  walkForStackGroups([...data.categories, ...(data.tags || [])]);
+
+  const stackedChildUids = new Set([...stackGroups.values()].flat());
+  const map = {};
+
+  // Assign base colors to non-child categories
+  let colorIndex = 0;
+  for (const uid of selected) {
+    if (stackedChildUids.has(uid)) continue;
+    map[uid] = fixedColors[uid] || CHART_COLORS[colorIndex % CHART_COLORS.length];
+    colorIndex++;
+  }
+
+  // Assign tinted colors to stacked children (replicating TrendChart logic)
+  for (const [parentUid, childUids] of stackGroups) {
+    const parentColor = map[parentUid];
+    childUids.forEach((cuid, ci) => {
+      map[cuid] = fixedColors[cuid] || childTintColor(parentColor, ci, childUids.length);
+    });
+  }
+
+  return map;
+}
+
 /*──────────────────────────────────────────────────────────────────────────────
   TrendsView — trends tab with category picker, granularity switcher, chart,
   and CSV copy button
 ──────────────────────────────────────────────────────────────────────────────*/
-export const TrendsView = ({ data, selected, setSelected, colorMap, granularity, setGranularity, scopeCategory }) => {
+export const TrendsView = ({
+  data,
+  selected,
+  setSelected,
+  fixedColors,
+  granularity,
+  setGranularity,
+  chartType,
+  setChartType,
+  scopeCategory,
+}) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopyCSV = useCallback(() => {
@@ -1013,13 +1285,21 @@ export const TrendsView = ({ data, selected, setSelected, colorMap, granularity,
     });
   }, [data, selected, granularity]);
 
+  // Full color map for the picker swatches (includes parent-derived tints)
+  const pickerColorMap = useMemo(
+    () => buildTrendsColorMap(data, selected, fixedColors),
+    [data, selected, fixedColors],
+  );
+
   // When scopeCategory is set, promote its children in the picker
   const pickerCategories = useMemo(() => {
     if (!scopeCategory || !data) return data?.categories || [];
     const scopeCat = data.categories.find((c) => c.uid === scopeCategory.uid);
-    const promoted = scopeCat?.children?.length ? scopeCat.children : data.categories;
+    const promoted = scopeCat?.children?.length
+      ? scopeCat.children
+      : data.categories;
     const others = data.categories.filter(
-      (c) => c.uid !== scopeCategory.uid && (data.totals[c.uid] || 0) > 0
+      (c) => c.uid !== scopeCategory.uid && (data.totals[c.uid] || 0) > 0,
     );
     return [...promoted, ...others];
   }, [data, scopeCategory]);
@@ -1032,7 +1312,7 @@ export const TrendsView = ({ data, selected, setSelected, colorMap, granularity,
         totals={data?.totals || {}}
         selected={selected}
         onSelectionChange={setSelected}
-        colorMap={colorMap}
+        colorMap={pickerColorMap}
       />
       <div className="et-trends-chart-area">
         <div className="et-granularity-switcher">
@@ -1048,6 +1328,21 @@ export const TrendsView = ({ data, selected, setSelected, colorMap, granularity,
               </button>
             ))}
           </div>
+          <div className="bp3-button-group bp3-small">
+            {[
+              { key: "bar", label: "Bars" },
+              { key: "line", label: "Lines" },
+              { key: "both", label: "Both" },
+            ].map((t) => (
+              <button
+                key={t.key}
+                className={`bp3-button${chartType === t.key ? " bp3-active bp3-intent-primary" : ""}`}
+                onClick={() => setChartType(t.key)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
           <button
             className={`bp3-button bp3-small bp3-minimal et-copy-btn${copied ? " et-copy-btn-done" : ""}`}
             onClick={handleCopyCSV}
@@ -1060,8 +1355,9 @@ export const TrendsView = ({ data, selected, setSelected, colorMap, granularity,
         <TrendChart
           data={data}
           selected={selected}
-          colorMap={colorMap}
+          fixedColors={fixedColors}
           granularity={granularity}
+          chartType={chartType}
         />
       </div>
     </div>
@@ -1069,78 +1365,126 @@ export const TrendsView = ({ data, selected, setSelected, colorMap, granularity,
 };
 
 /*──────────────────────────────────────────────────────────────────────────────
-  TimeDashboard — main modal
+  useDashboardData — shared data-fetch hook for both DNP and Page modes
 ──────────────────────────────────────────────────────────────────────────────*/
-export const VALID_PERIODS = new Set(["day", "week", "month", "quarter"]);
-
-const TimeDashboard = ({ onClose, extensionAPI, initialPeriod, initialReferenceDate }) => {
-  const [isOpen, setIsOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState("totals");
+function useDashboardData(mode, pageUid, period) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
-  const [period, setPeriod] = useState(() => {
-    const preset = VALID_PERIODS.has(initialPeriod) ? initialPeriod : "day";
-    const { startDate, endDate } = getDateRange(preset, initialReferenceDate);
-    return { preset, startDate, endDate };
-  });
   const [selected, setSelected] = useState(new Set());
-  const [granularity, setGranularity] = useState("day");
 
-  // Fetch data when period changes
   useEffect(() => {
+    if (mode === "page" && !pageUid) {
+      setLoading(false);
+      setData(null);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
-    getDashboardData(period.startDate, period.endDate).then((result) => {
+    setData(null);
+    const fetch =
+      mode === "page"
+        ? getDashboardDataForPage(pageUid, period.startDate, period.endDate)
+        : getDashboardData(period.startDate, period.endDate);
+
+    fetch.then((result) => {
       if (cancelled) return;
       setData(result);
       setLoading(false);
-
-      // Auto-select top categories by total time (up to 4)
       setSelected((prev) => {
         if (prev.size > 0) return prev;
-        const topLevel = result.categories
+        const scopeCategory = result.scopeCategory;
+        const topCats = scopeCategory
+          ? result.categories.find((c) => c.uid === scopeCategory.uid)
+              ?.children || result.categories
+          : result.categories;
+        const top = topCats
           .map((cat) => ({ uid: cat.uid, time: result.totals[cat.uid] || 0 }))
           .sort((a, b) => b.time - a.time)
           .slice(0, 4)
           .filter((c) => c.time > 0)
           .map((c) => c.uid);
-        return new Set(topLevel);
+        return new Set(top);
       });
     });
     return () => {
       cancelled = true;
     };
-  }, [period.startDate?.getTime(), period.endDate?.getTime()]);
+  }, [mode, pageUid, period.startDate?.getTime(), period.endDate?.getTime()]);
 
-  const handlePeriodChange = useCallback((newPeriod) => {
-    setPeriod(newPeriod);
-  }, []);
+  return { loading, data, selected, setSelected };
+}
+
+/*──────────────────────────────────────────────────────────────────────────────
+  TimeDashboard — unified modal (DNP + Page modes)
+──────────────────────────────────────────────────────────────────────────────*/
+export const VALID_PERIODS = new Set(["day", "week", "month", "quarter"]);
+
+const TimeDashboard = ({
+  onClose,
+  extensionAPI,
+  initialPeriod,
+  initialReferenceDate,
+  initialPageUid,
+  onOpenCategories,
+}) => {
+  const [isOpen, setIsOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState("totals");
+  // mode: "dnp" (daily note pages survey) | "page" (single-page survey)
+  const [mode, setMode] = useState(initialPageUid ? "page" : "dnp");
+  const [pageUid, setPageUid] = useState(initialPageUid || null);
+  const [period, setPeriod] = useState(() => {
+    const preset = VALID_PERIODS.has(initialPeriod)
+      ? initialPeriod
+      : initialPageUid
+        ? "month"
+        : "day";
+    const { startDate, endDate } = getDateRange(preset, initialReferenceDate);
+    return { preset, startDate, endDate };
+  });
+  const [granularity, setGranularity] = useState("day");
+  const [chartType, setChartType] = useState("bar");
+
+  const { loading, data, selected, setSelected } = useDashboardData(
+    mode,
+    pageUid,
+    period,
+  );
+
+  const handlePeriodChange = useCallback(
+    (newPeriod) => setPeriod(newPeriod),
+    [],
+  );
 
   const handleClose = () => {
     setIsOpen(false);
     onClose?.();
   };
 
-  // Fixed colors from settings (user-assigned in CategoriesManager)
+  const handleModeSwitch = (newMode) => {
+    if (newMode === mode) return;
+    setMode(newMode);
+    // Switch to a sensible default period for each mode
+    const preset = newMode === "page" ? "month" : "day";
+    const { startDate, endDate } = getDateRange(preset);
+    setPeriod({ preset, startDate, endDate });
+  };
+
+  const handlePageChange = useCallback((uid) => {
+    setPageUid(uid);
+    setSelected(new Set());
+  }, []);
+
   const fixedColors = useMemo(
     () => (extensionAPI ? getCategoryColorsMap(extensionAPI) : {}),
-    [extensionAPI]
+    [extensionAPI],
   );
 
-  // Color map for selected categories (shared between picker and chart)
-  const colorMap = useMemo(() => {
-    const map = {};
-    let i = 0;
-    for (const uid of selected) {
-      if (fixedColors[uid]) {
-        map[uid] = fixedColors[uid];
-      } else {
-        map[uid] = CHART_COLORS[i % CHART_COLORS.length];
-      }
-      i++;
-    }
-    return map;
-  }, [selected, fixedColors]);
+  const scopeCategory = data?.scopeCategory;
+
+  const title =
+    mode === "page" && data?.pageName
+      ? `Time Dashboard — ${data.pageName}`
+      : "Time Dashboard";
 
   if (!isOpen) return null;
 
@@ -1150,7 +1494,32 @@ const TimeDashboard = ({ onClose, extensionAPI, initialPeriod, initialReferenceD
         <div className="bp3-overlay-backdrop" onClick={handleClose} />
         <div className="bp3-dialog et-dashboard">
           <div className="bp3-dialog-header">
-            <h4 className="bp3-heading">Time Dashboard</h4>
+            <h4 className="bp3-heading">{title}</h4>
+            <div className="et-mode-switcher">
+              <button
+                className={`bp3-button bp3-small${mode === "dnp" ? " bp3-active bp3-intent-primary" : ""}`}
+                onClick={() => handleModeSwitch("dnp")}
+                title="Survey Daily Note Pages"
+              >
+                Daily Notes
+              </button>
+              <button
+                className={`bp3-button bp3-small${mode === "page" ? " bp3-active bp3-intent-primary" : ""}`}
+                onClick={() => handleModeSwitch("page")}
+                title="Survey a specific page"
+              >
+                Page
+              </button>
+            </div>
+            {onOpenCategories && (
+              <button
+                className="bp3-button bp3-minimal bp3-small"
+                title="Manage Categories"
+                onClick={onOpenCategories}
+              >
+                <span className="bp3-icon bp3-icon-cog" />
+              </button>
+            )}
             <button
               className="bp3-dialog-close-button bp3-button bp3-minimal"
               onClick={handleClose}
@@ -1158,7 +1527,16 @@ const TimeDashboard = ({ onClose, extensionAPI, initialPeriod, initialReferenceD
               <span className="bp3-icon bp3-icon-cross" />
             </button>
           </div>
+
           <div className="bp3-dialog-body et-dashboard-body">
+            {mode === "page" && (
+              <PageSelector
+                extensionAPI={extensionAPI}
+                pageUid={pageUid}
+                onPageChange={handlePageChange}
+              />
+            )}
+
             <PeriodSelector
               preset={period.preset}
               startDate={period.startDate}
@@ -1173,38 +1551,55 @@ const TimeDashboard = ({ onClose, extensionAPI, initialPeriod, initialReferenceD
               </div>
             )}
 
-            <div className="et-tab-bar">
-              <button
-                className={`bp3-button bp3-minimal ${
-                  activeTab === "totals" ? "bp3-active et-tab-active" : ""
-                }`}
-                onClick={() => setActiveTab("totals")}
-              >
-                Totals
-              </button>
-              <button
-                className={`bp3-button bp3-minimal ${
-                  activeTab === "trends" ? "bp3-active et-tab-active" : ""
-                }`}
-                onClick={() => setActiveTab("trends")}
-              >
-                Trends
-              </button>
-            </div>
+            {mode === "page" && !pageUid && !loading && (
+              <p className="et-empty-message">
+                Select a page above to display its time data.
+              </p>
+            )}
 
-            {!loading && activeTab === "totals" && <TotalsView data={data} preset={period.preset} fixedColors={fixedColors} />}
+            {(mode === "dnp" || pageUid) && (
+              <>
+                <div className="et-tab-bar">
+                  <button
+                    className={`bp3-button bp3-minimal ${activeTab === "totals" ? "bp3-active et-tab-active" : ""}`}
+                    onClick={() => setActiveTab("totals")}
+                  >
+                    Totals
+                  </button>
+                  <button
+                    className={`bp3-button bp3-minimal ${activeTab === "trends" ? "bp3-active et-tab-active" : ""}`}
+                    onClick={() => setActiveTab("trends")}
+                  >
+                    Trends
+                  </button>
+                </div>
 
-            {!loading && activeTab === "trends" && (
-              <TrendsView
-                data={data}
-                selected={selected}
-                setSelected={setSelected}
-                colorMap={colorMap}
-                granularity={granularity}
-                setGranularity={setGranularity}
-              />
+                {!loading && activeTab === "totals" && (
+                  <TotalsView
+                    data={data}
+                    preset={period.preset}
+                    fixedColors={fixedColors}
+                    scopeCategory={scopeCategory}
+                  />
+                )}
+
+                {!loading && activeTab === "trends" && (
+                  <TrendsView
+                    data={data}
+                    selected={selected}
+                    setSelected={setSelected}
+                    fixedColors={fixedColors}
+                    granularity={granularity}
+                    setGranularity={setGranularity}
+                    chartType={chartType}
+                    setChartType={setChartType}
+                    scopeCategory={scopeCategory}
+                  />
+                )}
+              </>
             )}
           </div>
+
           <div className="bp3-dialog-footer">
             <div className="bp3-dialog-footer-actions">
               <button
@@ -1224,7 +1619,13 @@ const TimeDashboard = ({ onClose, extensionAPI, initialPeriod, initialReferenceD
 /*──────────────────────────────────────────────────────────────────────────────
   Launcher
 ──────────────────────────────────────────────────────────────────────────────*/
-export function openTimeDashboard(extensionAPI, initialPeriod, initialReferenceDate) {
+export function openTimeDashboard(
+  extensionAPI,
+  initialPeriod,
+  initialReferenceDate,
+  initialPageUid,
+  onOpenCategories,
+) {
   renderOverlay({
     Overlay: (props) => (
       <TimeDashboard
@@ -1232,6 +1633,8 @@ export function openTimeDashboard(extensionAPI, initialPeriod, initialReferenceD
         extensionAPI={extensionAPI}
         initialPeriod={initialPeriod}
         initialReferenceDate={initialReferenceDate}
+        initialPageUid={initialPageUid}
+        onOpenCategories={onOpenCategories}
       />
     ),
   });
