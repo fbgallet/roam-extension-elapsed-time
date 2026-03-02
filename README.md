@@ -4,6 +4,12 @@ Easily **track the time spent on your activities and calculate the total time sp
 
 Review total by day, week, month, quarter, year, or any given period of time. Visualize trends over time with the built-in **Time Dashboard**.
 
+🆕 in v.5 (March 2026)
+
+- Dashboard to visualize Totals and Trends
+- Category manager dialog box
+- Category autocomplete picker with /Time tracker slash command
+
 see [changelog here](https://github.com/fbgallet/roam-extension-elapsed-time/blob/main/CHANGELOG.md)
 
 ![Time Tracker short demo v 5 bis](https://github.com/user-attachments/assets/98821747-a3f4-473d-a0a4-4d7b2c31d969)
