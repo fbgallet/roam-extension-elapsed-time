@@ -7,6 +7,7 @@ import {
   getBlockContent,
   getBlocksUidReferencedInThisBlock,
   getChildrenTree,
+  getDirectChildren,
   getParentUID,
   updateBlock,
 } from "./util";
@@ -68,7 +69,7 @@ export async function elapsedTime(blockUID, separator = null) {
     // if (remoteElapsedTime)
     //   hasTSinParent = await searchTimestampInParentBlock(blockUID);
     // if (!hasTSinParent && firstLoop) {
-    if (remoteElapsedTime) searchTimestampInPreviousSibbling(blockUID);
+    if (remoteElapsedTime) await searchTimestampInPreviousSibbling(blockUID);
     let now = new Date();
     separator = separator ? " " + separator : "";
     let nowTS =
@@ -89,7 +90,7 @@ export async function elapsedTime(blockUID, separator = null) {
       }
     }
     let focusedBlock = window.roamAlphaAPI.ui.getFocusedBlock();
-    updateBlock(blockUID, blockContent);
+    await updateBlock(blockUID, blockContent);
     setTimeout(() => {
       window.roamAlphaAPI.ui.setBlockFocusAndSelection({
         location: focusedBlock,
@@ -129,14 +130,20 @@ export async function elapsedTime(blockUID, separator = null) {
 //   if (!content) return false;
 //   return await elapsedTime(parentUid, false);
 // }
-function searchTimestampInPreviousSibbling(currentBlockUid) {
+async function searchTimestampInPreviousSibbling(currentBlockUid) {
   let parentUid = getParentUID(currentBlockUid);
   let order = getBlockAttributes(currentBlockUid).order;
-  let previousSibbling = getChildrenTree(parentUid).find(
-    (block) => block.order == order - 1
+  // Bypass cache to get fresh block data
+  let children = getDirectChildren(parentUid);
+  if (!children) return;
+  let siblings = children.filter((c) => c.order < order);
+  if (siblings.length === 0) return;
+  // Get the closest previous sibling (highest order less than current)
+  let previousSibbling = siblings.reduce((prev, curr) =>
+    curr.order > prev.order ? curr : prev
   );
   if (previousSibbling?.string.match(timestampRegex)?.length == 1) {
-    elapsedTime(previousSibbling.uid);
+    await elapsedTime(previousSibbling.uid);
   }
 }
 

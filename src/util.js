@@ -39,6 +39,15 @@ export function getChildrenTree(uid) {
   return tree;
 }
 
+export function getDirectChildren(uid) {
+  if (!uid) return null;
+  let result = window.roamAlphaAPI.q(`[:find (pull ?child
+      [:block/uid :block/string :block/order])
+     :where [?page :block/uid "${uid}"]
+            [?page :block/children ?child] ]`);
+  return result.length > 0 ? result.map((c) => c[0]) : null;
+}
+
 export function getParentUID(uid) {
   let q = `[:find ?u 
             :where [?p :block/uid ?u] 
@@ -185,11 +194,14 @@ export function getBlocksIncludingRef(uid) {
 }
 
 export function updateBlock(uid, content) {
-  setTimeout(function () {
-    window.roamAlphaAPI.updateBlock({
-      block: { uid: uid, string: content },
-    });
-  }, 50);
+  return new Promise((resolve) => {
+    setTimeout(function () {
+      window.roamAlphaAPI.updateBlock({
+        block: { uid: uid, string: content },
+      });
+      resolve();
+    }, 50);
+  });
 }
 
 export async function createBlock(

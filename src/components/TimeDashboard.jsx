@@ -1041,7 +1041,7 @@ const TrendChart = ({
           pointHoverRadius: 4,
           tension: 0.4,
           fill: false,
-          stack: undefined,
+          stack: `__line__${uid}`,
           order: 0, // lower = drawn later = on top; bars default to 1
         });
       }
